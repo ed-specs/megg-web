@@ -232,14 +232,17 @@ const getDeviceType = () => {
 }
 
 /**
- * Send login success notification to user
+ * Send login success notification to user with retry mechanism
  * @param {string} accountId - User's account ID
  * @param {string} username - User's username
+ * @param {number} retryCount - Current retry attempt (default: 0)
  * @returns {Promise<boolean>} Success status
  */
-export const sendLoginSuccessNotification = async (accountId, username) => {
+export const sendLoginSuccessNotification = async (accountId, username, retryCount = 0) => {
+  const maxRetries = 2
+  
   try {
-    console.log(`🔔 Sending login notification for ${username} (${accountId})`)
+    console.log(`🔔 Sending login notification for ${username} (${accountId}) - Attempt ${retryCount + 1}`)
     
     const response = await fetch('/api/notifications/send-push', {
       method: 'POST',
@@ -260,17 +263,33 @@ export const sendLoginSuccessNotification = async (accountId, username) => {
     })
 
     const result = await response.json()
-    console.log('Login notification API response:', result)
+    console.log(`Login notification API response (attempt ${retryCount + 1}):`, result)
 
     if (response.ok && result.success) {
       console.log('✅ Login success notification sent successfully')
       return true
     } else {
-      console.error('❌ Failed to send login success notification:', result)
+      console.error(`❌ Failed to send login success notification (attempt ${retryCount + 1}):`, result)
+      
+      // Retry if we haven't exceeded max retries
+      if (retryCount < maxRetries) {
+        console.log(`🔄 Retrying notification in 2 seconds... (${retryCount + 1}/${maxRetries})`)
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        return await sendLoginSuccessNotification(accountId, username, retryCount + 1)
+      }
+      
       return false
     }
   } catch (error) {
-    console.error('❌ Error sending login success notification:', error)
+    console.error(`❌ Error sending login success notification (attempt ${retryCount + 1}):`, error)
+    
+    // Retry if we haven't exceeded max retries
+    if (retryCount < maxRetries) {
+      console.log(`🔄 Retrying notification in 2 seconds... (${retryCount + 1}/${maxRetries})`)
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      return await sendLoginSuccessNotification(accountId, username, retryCount + 1)
+    }
+    
     return false
   }
 }
@@ -307,8 +326,8 @@ export const initializeFCMForUser = async (accountId, username = null) => {
 
   // Send login success notification if username is provided
   if (username) {
-    console.log(`🎯 Login notification scheduled for ${username} (${accountId}) in 2 seconds`)
-    // Wait a bit to ensure FCM token is properly registered
+    console.log(`🎯 Login notification scheduled for ${username} (${accountId}) in 5 seconds`)
+    // Wait longer to ensure FCM token is properly registered and synced
     setTimeout(async () => {
       console.log(`🚀 Now sending login notification for ${username}`)
       const success = await sendLoginSuccessNotification(accountId, username)
@@ -317,7 +336,7 @@ export const initializeFCMForUser = async (accountId, username = null) => {
       } else {
         console.log(`❌ Login notification failed for ${username}`)
       }
-    }, 2000)
+    }, 5000)
   } else {
     console.log('⚠️ No username provided - skipping login notification')
   }
