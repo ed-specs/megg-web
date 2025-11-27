@@ -9,6 +9,9 @@ import { collection, query, where, getDocs, setDoc, doc } from "firebase/firesto
 import Image from "next/image"
 import { generateOTP, calculateOTPExpiry } from "../../../app/utils/otp"
 import { generateUniqueAccountId, checkAccountIdExists } from "../../../app/utils/accountId"
+// Removed toast imports - reverting to modal responses
+import { Eye, EyeOff } from "lucide-react"
+import { smartInitializeFCM } from "../../utils/smart-fcm"
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -18,12 +21,16 @@ export default function RegisterPage() {
     email: "",
     password: "",
     confirmPassword: "",
+    role: "user", // Default role
   })
 
   const [accountId, setAccountId] = useState("")
   const [isGeneratingId, setIsGeneratingId] = useState(true)
 
   const [errors, setErrors] = useState({})
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, level: 'weak' })
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [globalMessage, setGlobalMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -56,11 +63,27 @@ export default function RegisterPage() {
       })
 
       if (!response.ok) {
-        throw new Error("Failed to send verification email")
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `HTTP ${response.status}: Failed to send verification email`
+        throw new Error(errorMessage)
       }
+
+      const result = await response.json()
+      console.log("Verification email sent successfully:", result)
+      return result
     } catch (error) {
       console.error("Error sending verification email:", error)
-      throw error
+      
+      // Provide more specific error messages
+      if (error.message.includes('EAUTH')) {
+        throw new Error("Email authentication failed. Please check email configuration.")
+      } else if (error.message.includes('SMTP')) {
+        throw new Error("Email server connection failed. Please try again later.")
+      } else if (error.message.includes('Invalid email')) {
+        throw new Error("Invalid email address format.")
+      } else {
+        throw new Error(error.message || "Failed to send verification email")
+      }
     }
   }
 
@@ -69,6 +92,37 @@ export default function RegisterPage() {
     const { name, value } = e.target
     setForm({ ...form, [name]: value })
     validateField(name, value)
+  }
+
+  const getPasswordStrength = (password) => {
+    let score = 0
+    const checks = {
+      length: password.length >= 8,
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      numbers: /[0-9]/.test(password),
+      symbols: /[^A-Za-z0-9]/.test(password)
+    }
+
+    Object.values(checks).forEach(check => {
+      if (check) score++
+    })
+
+    let level = 'weak'
+    let color = 'bg-red-500'
+    let width = '20%'
+
+    if (score >= 2 && score < 4) {
+      level = 'medium'
+      color = 'bg-yellow-500'
+      width = '60%'
+    } else if (score >= 4) {
+      level = 'strong'
+      color = 'bg-green-500'
+      width = '100%'
+    }
+
+    return { score, level, color, width, checks }
   }
 
   const validateField = (name, value) => {
@@ -91,6 +145,8 @@ export default function RegisterPage() {
         break
       case "password":
         if (value.length < 8) errorMsg = "Password must be at least 8 characters."
+        // Update password strength
+        setPasswordStrength(getPasswordStrength(value))
         break
       case "confirmPassword":
         if (value !== form.password) errorMsg = "Passwords do not match."
@@ -125,7 +181,7 @@ export default function RegisterPage() {
     }
 
     try {
-      // Check username availability
+      // Step 1: Check username availability
       const userRef = collection(db, "users")
       const usernameQuery = query(userRef, where("username", "==", form.username))
 
@@ -143,56 +199,96 @@ export default function RegisterPage() {
         return
       }
 
-      // Create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password)
+      // Step 2: Check email availability (Firebase will also check this, but we check early)
+      const emailQuery = query(userRef, where("email", "==", form.email))
+      try {
+        const emailSnapshot = await getDocs(emailQuery)
+        if (!emailSnapshot.empty) {
+          setGlobalMessage("Email already registered. Please use a different email.")
+          setIsLoading(false)
+          return
+        }
+      } catch (error) {
+        console.error("Error checking email:", error)
+        setGlobalMessage("Error checking email availability. Please try again.")
+        setIsLoading(false)
+        return
+      }
 
-      // Generate OTP and expiry time
+      // Step 3: Final check to ensure account ID is still unique
+      const finalCheck = await checkAccountIdExists(accountId, db)
+      if (finalCheck) {
+        setGlobalMessage("Account ID collision detected. Please try again.")
+        setIsLoading(false)
+        return
+      }
+
+      // Step 4: Generate OTP and test email sending BEFORE creating user
       const otp = generateOTP()
       const otpExpiry = calculateOTPExpiry()
 
-      // Update user profile
+      // Test email sending first (this is the critical step)
+      try {
+        await sendVerificationEmail(form.email, otp)
+        setGlobalMessage("Email verification sent successfully. Creating your account...")
+      } catch (emailError) {
+        console.error("Email sending failed:", emailError)
+        setGlobalMessage("Failed to send verification email. Please check your email address and try again.")
+        setIsLoading(false)
+        return
+      }
+
+      // Step 5: Only NOW create user in Firebase Auth (after email test passes)
+      const userCredential = await createUserWithEmailAndPassword(auth, form.email, form.password)
+
+      // Step 6: Update user profile
       await updateProfile(userCredential.user, {
         displayName: form.username,
       })
 
-      // Store user data and OTP in Firestore
+      // Step 7: Store user data in Firestore (email already tested, so this should work)
       try {
-        // Final check to ensure account ID is still unique before saving
-        const finalCheck = await checkAccountIdExists(accountId, db)
-        if (finalCheck) {
-          throw new Error("Account ID collision detected. Please try again.")
-        }
-
-        await setDoc(doc(db, "users", userCredential.user.uid), {
+        await setDoc(doc(db, "users", accountId), {
           fullname: form.fullname,
           username: form.username,
           email: form.email,
           phone: form.phone,
-          accountId: accountId, // Add the generated account ID
+          role: form.role, // Add user role
+          accountId: accountId, // Keep for reference
           createdAt: new Date().toISOString(),
           lastLogin: new Date().toISOString(),
-          uid: userCredential.user.uid,
+          uid: userCredential.user.uid, // Firebase Auth UID
           verified: false,
           verificationOTP: otp,
           otpExpiry: otpExpiry,
-          deviceId: auth.currentUser?.uid || "unknown", // Add device ID tracking
+          deviceId: null, // Will be set when FCM token is available
         })
 
-     
+        // Initialize FCM for push notifications (no login notification for new users)
+        try {
+          await smartInitializeFCM(accountId) // No username = no login notification
+          console.log("FCM initialized successfully for new user")
+        } catch (error) {
+          console.error("FCM initialization failed:", error)
+        }
 
-        await sendVerificationEmail(form.email, otp)
-
-        setGlobalMessage(`Account created successfully! Your Account ID is ${accountId}. Please check your email for verification.`)
+        // Success! Everything worked
+        setGlobalMessage(`Account created successfully! Your Account ID is ${accountId}. Verification email sent to ${form.email}.`)
         setTimeout(() => router.push(`/verify?email=${form.email}`), 3000)
-      } catch (error) {
-        console.error("Error saving user data:", error)
-        // Clean up by deleting the auth user if Firestore save fails
+        
+      } catch (firestoreError) {
+        console.error("Error saving user data to Firestore:", firestoreError)
+        
+        // Rollback: Delete the Firebase Auth user since Firestore save failed
         try {
           await userCredential.user.delete()
+          setGlobalMessage("Failed to save user data. Your account was not created. Please try again.")
         } catch (deleteError) {
-          console.error("Error deleting auth user:", deleteError)
+          console.error("Error deleting auth user during rollback:", deleteError)
+          setGlobalMessage("Registration failed and cleanup failed. Please contact support.")
         }
-        throw new Error("Failed to save user data. Please try again.")
+        setIsLoading(false)
+        return
       }
     } catch (error) {
       let errorMessage = "Registration failed. Please try again."
@@ -219,146 +315,402 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white lg:bg-transparent">
-      <div className="flex flex-col gap-10 w-full max-w-lg p-6 md:p-8 lg:bg-white lg:shadow lg:rounded-2xl lg:border lg:border-gray-300">
-        {/* logo */}
-        <div className="flex flex-col gap-4 items-center justify-center">
-          <Image src="/Logos/logoblue.png" alt="MEGG Logo" height={46} width={46} />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-orange-50 relative overflow-hidden">
+      {/* Background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <Image 
+            src="/background.png" 
+            alt="Background" 
+            fill
+            className="object-cover opacity-30"
+            priority={false}
+          />
+        </div>
+        
+        {/* Logo Background Blur */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-15">
+          <Image 
+            src="/Logos/logoblue.png" 
+            alt="MEGG Logo Background" 
+            fill
+            className="object-contain blur-xl scale-200"
+            priority={false}
+          />
+        </div>
+      </div>
 
-          <div className="flex flex-col text-center">
-            <span className="text-2xl font-bold">
-              Welcome to <span className="text-blue-900">MEGG</span>
-            </span>
-            <span className="text-gray-500">Create your account</span>
+      {/* Main Content */}
+      <div className="flex flex-col items-center justify-start min-h-screen px-6 py-8 relative z-10">
+        <div className="w-full max-w-sm mx-auto md:bg-white/80 md:backdrop-blur-sm md:border md:border-gray-200 md:rounded-3xl md:shadow-xl md:p-8 md:max-w-2xl lg:max-w-3xl">
+          {/* Logo */}
+          <div className="mb-8 text-left md:text-center">
+            <div className="relative inline-block mb-8">
+              <Image 
+                src="/Logos/logoblue.png" 
+                alt="MEGG Logo" 
+                height={80} 
+                width={80} 
+                className="object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-[#105588] mb-2 md:text-5xl md:font-bold lg:text-6xl lg:font-bold">Welcome</h1>
+              <p className="text-gray-600 text-base md:text-lg">Create your account</p>
+            </div>
+          </div>
+
+
+          {/* Registration Form */}
+          <form onSubmit={handleRegister} className="space-y-6">
+            {/* Two-column layout for desktop, single column for mobile */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Full Name Field */}
+              <div className="relative">
+                <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                  <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">FULL NAME</label>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                    <input
+                      type="text"
+                      name="fullname"
+                      id="fullname"
+                      className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                      placeholder="Juan Dela Cruz"
+                      onChange={handleInputChange}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                {errors.fullname && <span className="text-red-500 text-sm mt-1 block">{errors.fullname}</span>}
+              </div>
+
+              {/* Username Field */}
+              <div className="relative">
+                <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                  <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">USERNAME</label>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 0010 16a5.986 5.986 0 004.546-2.084A5 5 0 0010 11z" clipRule="evenodd" />
+                    </svg>
+                    <input
+                      type="text"
+                      name="username"
+                      id="username"
+                      className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                      placeholder="juandelacruz"
+                      onChange={handleInputChange}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                {errors.username && <span className="text-red-500 text-sm mt-1 block">{errors.username}</span>}
+              </div>
+
+              {/* Phone Field */}
+              <div className="relative">
+                <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                  <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">PHONE NUMBER</label>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z" />
+                    </svg>
+                    <input
+                      type="tel"
+                      name="phone"
+                      id="phone"
+                      className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                      placeholder="+63 912 345 6789"
+                      onChange={handleInputChange}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                {errors.phone && <span className="text-red-500 text-sm mt-1 block">{errors.phone}</span>}
+              </div>
+
+              {/* Password Field */}
+              <div className="relative">
+                <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                  <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">PASSWORD</label>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 616 0z" clipRule="evenodd" />
+                    </svg>
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      name="password"
+                      id="password"
+                      className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                      placeholder="••••••••••"
+                      onChange={handleInputChange}
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="ml-2 p-1 text-gray-400 hover:text-[#ff4a08] transition-colors duration-200"
+                      disabled={isLoading}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {/* Password Strength Indicator */}
+                {form.password && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500">Password strength</span>
+                      <span className={`text-xs font-medium ${
+                        passwordStrength.level === 'weak' ? 'text-red-500' :
+                        passwordStrength.level === 'medium' ? 'text-yellow-500' : 'text-green-500'
+                      }`}>
+                        {passwordStrength.level.charAt(0).toUpperCase() + passwordStrength.level.slice(1)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div 
+                        className={`h-1.5 rounded-full transition-all duration-300 ${passwordStrength.color}`}
+                        style={{ width: passwordStrength.width }}
+                      ></div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {Object.entries(passwordStrength.checks || {}).map(([key, passed]) => (
+                        <span key={key} className={`text-xs px-2 py-1 rounded ${
+                          passed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {key === 'length' ? '8+ chars' :
+                           key === 'lowercase' ? 'a-z' :
+                           key === 'uppercase' ? 'A-Z' :
+                           key === 'numbers' ? '0-9' : 'symbols'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {errors.password && <span className="text-red-500 text-sm mt-1 block">{errors.password}</span>}
+              </div>
+            </div>
+
+            {/* Full-width fields */}
+            <div className="space-y-6">
+              {/* Email Field */}
+              <div className="relative">
+                <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                  <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">EMAIL</label>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z" />
+                      <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
+                    </svg>
+                    <input
+                      type="email"
+                      name="email"
+                      id="email"
+                      className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                      placeholder="juan@example.com"
+                      onChange={handleInputChange}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                {errors.email && <span className="text-red-500 text-sm mt-1 block">{errors.email}</span>}
+              </div>
+
+              {/* Account ID Field */}
+              <div className="relative">
+                <div className="bg-gray-100 rounded-2xl px-4 py-4 opacity-75">
+                  <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">ACCOUNT ID</label>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M6 6V5a3 3 0 013-3h2a3 3 0 013 3v1h2a2 2 0 012 2v3.57A22.952 22.952 0 0110 13a22.95 22.95 0 01-8-1.43V8a2 2 0 012-2h2zm2-1a1 1 0 011-1h2a1 1 0 011 1v1H8V5zm1 5a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1z" clipRule="evenodd" />
+                      <path d="M2 13.692V16a2 2 0 002 2h12a2 2 0 002-2v-2.308A24.974 24.974 0 0110 15c-2.796 0-5.487-.46-8-1.308z" />
+                    </svg>
+                    <input
+                      type="text"
+                      name="accountId"
+                      id="accountId"
+                      className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-500 text-base p-0 font-mono"
+                      value={isGeneratingId ? "Generating..." : accountId || "Error generating ID"}
+                      disabled={true}
+                      readOnly
+                    />
+                  </div>
+                </div>
+                <span className="text-xs text-gray-500 mt-1 block">This ID will be assigned to your account</span>
+              </div>
+
+              {/* Confirm Password Field */}
+              <div className="relative">
+                <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                  <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">CONFIRM PASSWORD</label>
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <input
+                      type={showConfirmPassword ? "text" : "password"}
+                      name="confirmPassword"
+                      id="confirmPassword"
+                      className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                      placeholder="••••••••••"
+                      onChange={handleInputChange}
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="ml-2 p-1 text-gray-400 hover:text-[#ff4a08] transition-colors duration-200"
+                      disabled={isLoading}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+                {errors.confirmPassword && <span className="text-red-500 text-sm mt-1 block">{errors.confirmPassword}</span>}
+              </div>
+            </div>
+
+            {/* Role Selection */}
+            <div className="relative">
+              <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">ACCOUNT TYPE</label>
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                  </svg>
+                  <select
+                    name="role"
+                    id="role"
+                    value={form.role}
+                    className="flex-1 bg-transparent border-0 outline-none text-gray-800 text-base p-0 transition-all duration-200"
+                    onChange={handleInputChange}
+                    disabled={isLoading}
+                  >
+                    <option value="user">User - Personal Dashboard</option>
+                    <option value="admin">Admin - System Management</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Create Account Button */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-[#105588] text-white py-4 px-4 rounded-2xl hover:bg-[#0d4470] focus:outline-none focus:ring-2 focus:ring-[#ff4a08] focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg relative overflow-hidden"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Creating account...
+                  </div>
+                ) : (
+                  <>
+                    CREATE ACCOUNT
+                    <div className="absolute bottom-0 left-0 h-1 bg-[#ff4a08] w-1/3 rounded-full"></div>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {/* Sign In Link */}
+          <div className="mt-8">
+            {/* Divider */}
+            <div className="flex items-center mb-6">
+              <div className="flex-1 border-t border-gray-200"></div>
+              <div className="px-4 text-sm text-gray-500">Already have an account?</div>
+              <div className="flex-1 border-t border-gray-200"></div>
+            </div>
+
+            {/* Sign In Button */}
+            <button
+              onClick={viewSignIn}
+              className="w-full bg-white border border-gray-200 text-gray-700 py-4 px-4 rounded-2xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#ff4a08] focus:ring-offset-2 transition-all duration-200 font-medium flex items-center justify-center shadow-sm"
+            >
+              <svg className="w-5 h-5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+              </svg>
+              Back to Sign In
+            </button>
+          </div>
+
+        </div>
+      </div>
+      
+      {/* Enhanced Global Message Modal */}
+      {globalMessage && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl border border-white/20 transform animate-in fade-in duration-300 scale-95 animate-in">
+            {/* Icon based on message type */}
+            <div className="flex justify-center mb-6">
+              {globalMessage.toLowerCase().includes('success') || globalMessage.toLowerCase().includes('created') ? (
+                // Success Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              ) : globalMessage.toLowerCase().includes('error') || globalMessage.toLowerCase().includes('failed') || globalMessage.toLowerCase().includes('invalid') || globalMessage.toLowerCase().includes('taken') ? (
+                // Error Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+              ) : globalMessage.toLowerCase().includes('verify') || globalMessage.toLowerCase().includes('check') || globalMessage.toLowerCase().includes('email') ? (
+                // Warning/Info Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-[#ff4a08] to-[#f69664] rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              ) : (
+                // Default Info Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-[#105588] to-[#0d4470] rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Message Content */}
+            <div className="text-center mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                {globalMessage.toLowerCase().includes('success') || globalMessage.toLowerCase().includes('created') ? 'Success!' :
+                 globalMessage.toLowerCase().includes('error') || globalMessage.toLowerCase().includes('failed') || globalMessage.toLowerCase().includes('invalid') || globalMessage.toLowerCase().includes('taken') ? 'Error' :
+                 globalMessage.toLowerCase().includes('verify') || globalMessage.toLowerCase().includes('check') || globalMessage.toLowerCase().includes('email') ? 'Email Verification' : 'Information'}
+              </h3>
+              <p className="text-gray-700 leading-relaxed text-base">{globalMessage}</p>
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={() => setGlobalMessage("")}
+              className="w-full bg-gradient-to-r from-[#105588] to-[#0d4470] text-white py-4 px-6 rounded-2xl hover:from-[#0d4470] hover:to-[#0a3a5c] focus:outline-none focus:ring-4 focus:ring-[#105588]/30 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center group"
+            >
+              <span>Got it</span>
+              <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+              </svg>
+            </button>
           </div>
         </div>
-
-        {/* validation */}
-        {globalMessage && (
-          <div className={`px-4 py-2 rounded-lg border-l-4 ${
-            globalMessage.includes("successfully") || globalMessage.includes("Account created")
-              ? "bg-green-100 border-green-500 text-green-500"
-              : "bg-red-100 border-red-500 text-red-500"
-          }`}>
-            {globalMessage}
-          </div>
-        )}
-
-
-        {/* forms */}
-        <form onSubmit={handleRegister} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-1 flex flex-col gap-2">
-              <label htmlFor="fullname">Fullname</label>
-              <input
-                type="text"
-                name="fullname"
-                id="fullname"
-                className="border-b-2 border-gray-300 p-2 rounded outline-none focus:border-blue-500 transition-colors duration-150"
-                placeholder="e.g. Juan Dela Cruz"
-                onChange={handleInputChange}
-                disabled={isLoading}
-              />
-              {errors.fullname && <span className="text-red-500 text-sm">{errors.fullname}</span>}
-            </div>
-            <div className="col-span-1 flex flex-col gap-2">
-              <label htmlFor="username">Username</label>
-              <input
-                type="text"
-                name="username"
-                id="username"
-                className="border-b-2 border-gray-300 p-2 rounded outline-none focus:border-blue-500 transition-colors duration-150"
-                placeholder="e.g. juandelacruz"
-                onChange={handleInputChange}
-                disabled={isLoading}
-              />
-              {errors.username && <span className="text-red-500 text-sm">{errors.username}</span>}
-            </div>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              name="email"
-              id="email"
-              className="border-b-2 border-gray-300 p-2 rounded outline-none focus:border-blue-500 transition-colors duration-150"
-              placeholder="Enter your email address"
-              onChange={handleInputChange}
-              disabled={isLoading}
-            />
-            {errors.email && <span className="text-red-500 text-sm">{errors.email}</span>}
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="accountId">Account ID</label>
-            <input
-              type="text"
-              name="accountId"
-              id="accountId"
-              className="border-b-2 border-gray-300 p-2 rounded outline-none focus:border-blue-500 transition-colors duration-150 font-mono"
-              value={isGeneratingId ? "Generating..." : accountId || "Error generating ID"}
-              disabled={true}
-              readOnly
-            />
-            <span className="text-xs text-gray-500">This ID will be assigned to your account</span>
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="phone">Phone number</label>
-            <input
-              type="tel"
-              name="phone"
-              id="phone"
-              className="border-b-2 border-gray-300 p-2 rounded outline-none focus:border-blue-500 transition-colors duration-150"
-              placeholder="Enter your phone number"
-              onChange={handleInputChange}
-              disabled={isLoading}
-            />
-            {errors.phone && <span className="text-red-500 text-sm">{errors.phone}</span>}
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              name="password"
-              id="password"
-              className="border-b-2 border-gray-300 p-2 outline-none focus:border-blue-500 transition-colors duration-150"
-              placeholder="Enter your password"
-              onChange={handleInputChange}
-              disabled={isLoading}
-            />
-            {errors.password && <span className="text-red-500 text-sm">{errors.password}</span>}
-          </div>
-          <div className="flex flex-col gap-2">
-            <label htmlFor="confirmPassword">Confirm password</label>
-            <input
-              type="password"
-              name="confirmPassword"
-              id="confirmPassword"
-              className="border-b-2 border-gray-300 p-2 outline-none focus:border-blue-500 transition-colors duration-150"
-              placeholder="Re-enter your password"
-              onChange={handleInputChange}
-              disabled={isLoading}
-            />
-            {errors.confirmPassword && <span className="text-red-500 text-sm">{errors.confirmPassword}</span>}
-          </div>
-          <div className="flex flex-col gap-4 mt-4">
-            <button 
-              type="submit"
-              className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 transition-colors duration-150 cursor-pointer text-white w-full disabled:bg-blue-300 disabled:cursor-not-allowed"
-              disabled={isLoading}
-            >
-              {isLoading ? "Creating account..." : "Create account"}
-            </button>
-
-            <button 
-              type="button" 
-              onClick={viewSignIn} 
-              className="border border-gray-300 hover:bg-gray-100 transition-colors duration-150 cursor-pointer rounded-lg flex items-center justify-center px-4 py-2 gap-2"
-            >
-              Go back to Sign in
-            </button>
-          </div>
-        </form>
-      </div>
+      )}
     </div>
   )
 }

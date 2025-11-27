@@ -9,6 +9,7 @@ import { signInWithEmailAndPassword, updatePassword, sendPasswordResetEmail } fr
 import Image from "next/image"
 import { verifyResetToken } from "../../../utils/token"
 import bcrypt from "bcryptjs"
+import { Mail, Eye, EyeOff, Lock } from "lucide-react"
 
 function PasswordPageContent() {
   const [form, setForm] = useState({
@@ -24,6 +25,9 @@ function PasswordPageContent() {
   const [userEmail, setUserEmail] = useState("")
   const [userId, setUserId] = useState("")
   const [isForgotPassword, setIsForgotPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, level: 'weak' })
   
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -88,6 +92,37 @@ function PasswordPageContent() {
     }
   }
 
+  const getPasswordStrength = (password) => {
+    let score = 0
+    const checks = {
+      length: password.length >= 8,
+      lowercase: /[a-z]/.test(password),
+      uppercase: /[A-Z]/.test(password),
+      numbers: /[0-9]/.test(password),
+      symbols: /[^A-Za-z0-9]/.test(password)
+    }
+
+    Object.values(checks).forEach(check => {
+      if (check) score++
+    })
+
+    let level = 'weak'
+    let color = 'bg-red-500'
+    let width = '20%'
+
+    if (score >= 2 && score < 4) {
+      level = 'medium'
+      color = 'bg-yellow-500'
+      width = '60%'
+    } else if (score >= 4) {
+      level = 'strong'
+      color = 'bg-green-500'
+      width = '100%'
+    }
+
+    return { score, level, color, width, checks }
+  }
+
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setForm({ ...form, [name]: value })
@@ -108,15 +143,9 @@ function PasswordPageContent() {
       case "password":
         if (value.length < 8) {
           errorMsg = "Password must be at least 8 characters."
-        } else if (!/\d/.test(value)) {
-          errorMsg = "Password must contain at least one number."
-        } else if (!/[a-z]/.test(value)) {
-          errorMsg = "Password must contain at least one lowercase letter."
-        } else if (!/[A-Z]/.test(value)) {
-          errorMsg = "Password must contain at least one uppercase letter."
-        } else if (!/[!@#$%^&*]/.test(value)) {
-          errorMsg = "Password must contain at least one special character (!@#$%^&*)."
         }
+        // Update password strength
+        setPasswordStrength(getPasswordStrength(value))
         break
       case "confirmPassword":
         if (value !== form.password) errorMsg = "Passwords do not match."
@@ -241,107 +270,275 @@ function PasswordPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white lg:bg-transparent">
-      <div className="flex flex-col gap-10 w-full max-w-lg p-6 md:p-8 lg:bg-white lg:shadow lg:rounded-2xl lg:border lg:border-gray-300">
-        {/* logo */}
-        <div className="flex flex-col gap-4 items-center justify-center">
-          <Image src="/logo.png" alt="MEGG Logo" height={46} width={46} />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-orange-50 relative overflow-hidden">
+      {/* Background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <Image 
+            src="/background.png" 
+            alt="Background" 
+            fill
+            className="object-cover opacity-30"
+            priority={false}
+          />
+        </div>
+        
+        {/* Logo Background Blur */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-15">
+          <Image 
+            src="/Logos/logoblue.png" 
+            alt="MEGG Logo Background" 
+            fill
+            className="object-contain blur-xl scale-200"
+            priority={false}
+          />
+        </div>
+      </div>
 
-          <div className="flex flex-col text-center">
-            <span className="text-2xl font-bold">
-              {isForgotPassword ? "Forgot password" : "Reset password"}
-            </span>
-            <span className="text-gray-500">
-              {isForgotPassword 
-                ? "Enter the email address you used to register with"
-                : "Your new password must be different to previous password."
-              }
-            </span>
+      {/* Main Content */}
+      <div className="flex flex-col items-center justify-start min-h-[calc(100vh-60px)] px-6 pt-16 relative z-10">
+        <div className="w-full max-w-sm mx-auto md:bg-white/80 md:backdrop-blur-sm md:border md:border-gray-200 md:rounded-3xl md:shadow-xl md:p-8 md:max-w-md lg:max-w-lg">
+          {/* Logo */}
+          <div className="mb-8 text-left md:text-center">
+            <div className="relative inline-block mb-8">
+              <Image 
+                src="/Logos/logoblue.png" 
+                alt="MEGG Logo" 
+                height={80} 
+                width={80} 
+                className="object-contain"
+              />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-[#105588] mb-2 md:text-5xl md:font-bold lg:text-6xl lg:font-bold">
+                {isForgotPassword ? "Forgot Password" : "Reset Password"}
+              </h1>
+              <p className="text-gray-600 text-base md:text-lg">
+                {isForgotPassword 
+                  ? "Enter your email to receive a reset link"
+                  : "Create a new secure password"
+                }
+              </p>
+            </div>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={isForgotPassword ? handleForgotPassword : handleResetPassword} className="space-y-6">
+            {isForgotPassword ? (
+              // Forgot Password Form - Email Field
+              <div className="relative">
+                <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                  <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">EMAIL</label>
+                  <div className="flex items-center">
+                    <Mail className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" />
+                    <input
+                      type="email"
+                      name="email"
+                      id="email"
+                      value={form.email}
+                      className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                      placeholder="johndoe@gmail.com"
+                      onChange={handleInputChange}
+                      disabled={isLoading}
+                    />
+                  </div>
+                </div>
+                {errors.email && <span className="text-red-500 text-sm mt-1 block">{errors.email}</span>}
+              </div>
+            ) : (
+              // Reset Password Form - Password Fields
+              <>
+                {/* New Password Field */}
+                <div className="relative">
+                  <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                    <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">NEW PASSWORD</label>
+                    <div className="flex items-center">
+                      <Lock className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" />
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        id="password"
+                        value={form.password}
+                        className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                        placeholder="••••••••••"
+                        onChange={handleInputChange}
+                        disabled={isLoading || !isValidToken}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="ml-2 p-1 text-gray-400 hover:text-[#ff4a08] transition-colors duration-200"
+                        disabled={isLoading}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                  </div>
+                </div>
+                {/* Password Strength Indicator */}
+                {form.password && (
+                  <div className="mt-2">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500">Password strength</span>
+                      <span className={`text-xs font-medium ${
+                        passwordStrength.level === 'weak' ? 'text-red-500' :
+                        passwordStrength.level === 'medium' ? 'text-yellow-500' : 'text-green-500'
+                      }`}>
+                        {passwordStrength.level.charAt(0).toUpperCase() + passwordStrength.level.slice(1)}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-1.5">
+                      <div 
+                        className={`h-1.5 rounded-full transition-all duration-300 ${passwordStrength.color}`}
+                        style={{ width: passwordStrength.width }}
+                      ></div>
+                    </div>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {Object.entries(passwordStrength.checks || {}).map(([key, passed]) => (
+                        <span key={key} className={`text-xs px-2 py-1 rounded ${
+                          passed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {key === 'length' ? '8+ chars' :
+                           key === 'lowercase' ? 'a-z' :
+                           key === 'uppercase' ? 'A-Z' :
+                           key === 'numbers' ? '0-9' : 'symbols'}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {errors.password && <span className="text-red-500 text-sm mt-1 block">{errors.password}</span>}
+              </div>
+
+                {/* Confirm Password Field */}
+                <div className="relative">
+                  <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
+                    <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">CONFIRM PASSWORD</label>
+                    <div className="flex items-center">
+                      <Lock className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" />
+                      <input
+                        type={showConfirmPassword ? "text" : "password"}
+                        name="confirmPassword"
+                        id="confirmPassword"
+                        value={form.confirmPassword}
+                        className="flex-1 bg-transparent border-0 outline-none text-gray-800 placeholder-gray-400 focus:placeholder-gray-300 text-base p-0 transition-all duration-200"
+                        placeholder="••••••••••"
+                        onChange={handleInputChange}
+                        disabled={isLoading || !isValidToken}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="ml-2 p-1 text-gray-400 hover:text-[#ff4a08] transition-colors duration-200"
+                        disabled={isLoading}
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  {errors.confirmPassword && <span className="text-red-500 text-sm mt-1 block">{errors.confirmPassword}</span>}
+                </div>
+              </>
+            )}
+
+            {/* Submit Button */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={isLoading || (!isForgotPassword && !isValidToken)}
+                className="w-full bg-[#105588] text-white py-4 px-4 rounded-2xl hover:bg-[#0d4470] focus:outline-none focus:ring-2 focus:ring-[#ff4a08] focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg relative overflow-hidden"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    {isForgotPassword ? "Sending..." : "Resetting Password..."}
+                  </div>
+                ) : (
+                  <>
+                    {isForgotPassword ? "SEND RESET LINK" : "CHANGE PASSWORD"}
+                    <div className="absolute bottom-0 left-0 h-1 bg-[#ff4a08] w-1/3 rounded-full"></div>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Back to Sign In */}
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={viewSignIn}
+                className="w-full bg-white border border-gray-200 text-gray-700 py-4 px-4 rounded-2xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#ff4a08] focus:ring-offset-2 transition-all duration-200 font-medium flex items-center justify-center shadow-sm"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Sign In
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+      
+      {/* Enhanced Global Message Modal */}
+      {globalMessage && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl border border-white/20 transform animate-in fade-in duration-300 scale-95 animate-in">
+            {/* Icon based on message type */}
+            <div className="flex justify-center mb-6">
+              {globalMessage.toLowerCase().includes('success') || globalMessage.toLowerCase().includes('sent') || globalMessage.toLowerCase().includes('updated') ? (
+                // Success Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              ) : globalMessage.toLowerCase().includes('error') || globalMessage.toLowerCase().includes('failed') || globalMessage.toLowerCase().includes('invalid') || globalMessage.toLowerCase().includes('expired') ? (
+                // Error Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+              ) : (
+                // Default Info Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-[#105588] to-[#0d4470] rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Message Content */}
+            <div className="text-center mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                {globalMessage.toLowerCase().includes('success') || globalMessage.toLowerCase().includes('sent') || globalMessage.toLowerCase().includes('updated') ? 'Success!' :
+                 globalMessage.toLowerCase().includes('error') || globalMessage.toLowerCase().includes('failed') || globalMessage.toLowerCase().includes('invalid') || globalMessage.toLowerCase().includes('expired') ? 'Error' : 'Information'}
+              </h3>
+              <p className="text-gray-700 leading-relaxed text-base">{globalMessage}</p>
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={() => setGlobalMessage("")}
+              className="w-full bg-gradient-to-r from-[#105588] to-[#0d4470] text-white py-4 px-6 rounded-2xl hover:from-[#0d4470] hover:to-[#0a3a5c] focus:outline-none focus:ring-4 focus:ring-[#105588]/30 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center group"
+            >
+              <span>Got it</span>
+              <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+              </svg>
+            </button>
           </div>
         </div>
-
-        {/* validation */}
-        {globalMessage && (
-          <div className={`px-4 py-2 rounded-lg border-l-4 ${
-            globalMessage.includes("successfully") || globalMessage.includes("sent")
-              ? "bg-green-100 border-green-500 text-green-500"
-              : "bg-red-100 border-red-500 text-red-500"
-          }`}>
-            {globalMessage}
-          </div>
-        )}
-
-        {/* forms */}
-        <form onSubmit={isForgotPassword ? handleForgotPassword : handleResetPassword} className="flex flex-col gap-4">
-          {isForgotPassword ? (
-            // Forgot Password Form
-            <div className="flex flex-col gap-2">
-              <label htmlFor="email">Email</label>
-              <input
-                type="email"
-                name="email"
-                id="email"
-                className="border-b-2 border-gray-300 p-2 outline-none focus:border-blue-500 transition-colors duration-150"
-                placeholder="Enter your email address"
-                onChange={handleInputChange}
-                disabled={isLoading}
-              />
-              {errors.email && <span className="text-red-500 text-sm">{errors.email}</span>}
-            </div>
-          ) : (
-            // Reset Password Form
-            <>
-              <div className="flex flex-col gap-2">
-                <label htmlFor="password">New password</label>
-                <input
-                  type="password"
-                  name="password"
-                  id="password"
-                  className="border-b-2 border-gray-300 p-2 outline-none focus:border-blue-500 transition-colors duration-150"
-                  placeholder="Enter your password"
-                  onChange={handleInputChange}
-                  disabled={isLoading || !isValidToken}
-                />
-                {errors.password && <span className="text-red-500 text-sm">{errors.password}</span>}
-              </div>
-              <div className="flex flex-col gap-2">
-                <label htmlFor="confirmPassword">Confirm password</label>
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  id="confirmPassword"
-                  className="border-b-2 border-gray-300 p-2 outline-none focus:border-blue-500 transition-colors duration-150"
-                  placeholder="Re-enter your password"
-                  onChange={handleInputChange}
-                  disabled={isLoading || !isValidToken}
-                />
-                {errors.confirmPassword && <span className="text-red-500 text-sm">{errors.confirmPassword}</span>}
-              </div>
-            </>
-          )}
-          
-          <div className="flex flex-col gap-4 mt-4">
-            <button 
-              type="submit"
-              disabled={isLoading || (!isForgotPassword && !isValidToken)}
-              className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 transition-colors duration-150 cursor-pointer text-white w-full disabled:bg-blue-300 disabled:cursor-not-allowed"
-            >
-              {isLoading 
-                ? (isForgotPassword ? "Sending..." : "Resetting Password...") 
-                : (isForgotPassword ? "Send reset link" : "Change password")
-              }
-            </button>
-
-            <button
-              type="button"
-              onClick={viewSignIn}
-              className="border border-gray-300 hover:bg-gray-100 transition-colors duration-150 cursor-pointer rounded-lg flex items-center justify-center px-4 py-2 gap-2"
-            >
-              Go back to Sign in
-            </button>
-          </div>
-        </form>
-      </div>
+      )}
     </div>
   )
 }
