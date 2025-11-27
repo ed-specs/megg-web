@@ -456,8 +456,8 @@ export default function LoginPage() {
         }
 
       resetLoginAttempts() // Reset on successful login
-      console.log("🕐 LOGIN: Waiting 3 seconds before redirect to allow notification to be sent...")
-      redirectBasedOnRole(userData.role, 3000) // Wait 3 seconds for notification
+      console.log("🕐 LOGIN: Waiting 6 seconds before redirect to allow notification to be sent...")
+      redirectBasedOnRole(userData.role, 6000) // Wait 6 seconds for notification
       } else {
         // Fallback to Firebase Auth if no hashed password exists
         const userCredential = await signInWithEmailAndPassword(auth, userEmail, form.password)

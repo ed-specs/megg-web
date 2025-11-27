@@ -46,18 +46,28 @@ export const smartInitializeFCM = async (accountId, username = null) => {
     // Send login success notification if username is provided (simplified for debugging)
     if (username) {
       const currentTime = Date.now()
-      console.log(`🧠 Smart FCM [${callId}]: Login notification scheduled for ${username} (${accountId}) in 2 seconds`)
+      console.log(`🧠 Smart FCM [${callId}]: Login notification scheduled for ${username} (${accountId}) in 5 seconds`)
       
-      // Wait a bit to ensure FCM token is properly registered
+      // Wait longer to ensure FCM token is properly registered and synced
       setTimeout(async () => {
-        console.log(`🧠 Smart FCM [${callId}]: Now sending login notification for ${username}`)
+        console.log(`🧠 Smart FCM [${callId}]: Now verifying token and sending login notification for ${username}`)
+        
+        // Verify token exists before sending notification
+        const tokenExists = await verifyTokenInFirestore(accountId, fcmToken)
+        if (!tokenExists) {
+          console.log(`🧠 Smart FCM [${callId}]: ⚠️ Token not found in Firestore, retrying token update...`)
+          await updateUserFCMToken(accountId, fcmToken)
+          // Wait a bit more after retry
+          await new Promise(resolve => setTimeout(resolve, 1000))
+        }
+        
         const success = await sendLoginSuccessNotification(accountId, username)
         if (success) {
           console.log(`🧠 Smart FCM [${callId}]: ✅ Login notification completed for ${username}`)
         } else {
           console.log(`🧠 Smart FCM [${callId}]: ❌ Login notification failed for ${username}`)
         }
-      }, 2000)
+      }, 5000)
     } else {
       console.log(`🧠 Smart FCM [${callId}]: ⚠️ No username provided - skipping login notification`)
     }
