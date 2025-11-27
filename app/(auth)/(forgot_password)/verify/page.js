@@ -15,6 +15,7 @@ function VerifyPageContent() {
   const [globalMessage, setGlobalMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [timeLeft, setTimeLeft] = useState(900) // 15 minutes in seconds
+  const [resendCooldown, setResendCooldown] = useState(0) // Cooldown for resend button
   const router = useRouter()
   const searchParams = useSearchParams()
   const email = searchParams.get("email")
@@ -26,7 +27,7 @@ function VerifyPageContent() {
       return
     }
 
-    // Start countdown timer
+    // Start countdown timer for OTP expiry
     const timer = setInterval(() => {
       setTimeLeft((prevTime) => {
         if (prevTime <= 1) {
@@ -37,7 +38,20 @@ function VerifyPageContent() {
       })
     }, 1000)
 
-    return () => clearInterval(timer)
+    // Start countdown timer for resend cooldown
+    const resendTimer = setInterval(() => {
+      setResendCooldown((prevTime) => {
+        if (prevTime <= 1) {
+          return 0
+        }
+        return prevTime - 1
+      })
+    }, 1000)
+
+    return () => {
+      clearInterval(timer)
+      clearInterval(resendTimer)
+    }
   }, [email, router])
 
   const handleChange = (e, index) => {
@@ -107,6 +121,7 @@ function VerifyPageContent() {
 
       setGlobalMessage("New verification code sent!")
       setTimeLeft(900) // Reset timer to 15 minutes
+      setResendCooldown(60) // Set 1-minute cooldown for next resend
     } catch (error) {
       console.error("Error resending OTP:", error)
       setGlobalMessage("Failed to resend verification code. Please try again.")
@@ -176,86 +191,191 @@ function VerifyPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white lg:bg-transparent">
-      <div className="flex flex-col gap-10 w-full max-w-lg p-6 md:p-8 lg:bg-white lg:shadow lg:rounded-2xl lg:border lg:border-gray-300">
-        {/* logo */}
-        <div className="flex flex-col gap-4 items-center justify-center">
-          <Image src="/Logos/logoblue.png" alt="MEGG Logo" height={46} width={46} />
-          <div className="flex flex-col text-center">
-            <span className="text-2xl font-bold">Verify your email</span>
-            <span className="text-gray-500">
-              Enter the 6-digit code sent to{" "}
-              <span className="font-medium text-black">{email || "name@example.com"}</span>
-            </span>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-orange-50 relative overflow-hidden">
+      {/* Background elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <Image 
+            src="/background.png" 
+            alt="Background" 
+            fill
+            className="object-cover opacity-30"
+            priority={false}
+          />
         </div>
+        
+        {/* Logo Background Blur */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] opacity-15">
+          <Image 
+            src="/Logos/logoblue.png" 
+            alt="MEGG Logo Background" 
+            fill
+            className="object-contain blur-xl scale-200"
+            priority={false}
+          />
+        </div>
+      </div>
 
-        {/* validation */}
-        {globalMessage && (
-          <div className={`flex px-4 py-2 rounded-lg border-l-4 ${
-            globalMessage.includes("success")
-              ? "bg-green-100 border-green-500 text-green-500"
-              : "bg-red-100 border-red-500 text-red-500"
-          }`}>
-            <TriangleAlert className="w-5 h-5" />
-            <span className="ml-2">{globalMessage}</span>
-          </div>
-        )}
-
-        {/* forms */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-          <div className="grid grid-cols-6 gap-2 place-items-center">
-            {otp.map((digit, index) => (
-              <input
-                key={index}
-                ref={(el) => (inputRefs.current[index] = el)}
-                type="text"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleChange(e, index)}
-                onKeyDown={(e) => handleKeyDown(e, index)}
-                inputMode="numeric"
-                disabled={isLoading}
-                className="w-12 h-12 text-center border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 disabled:bg-gray-100 text-lg"
+      {/* Main Content */}
+      <div className="flex flex-col items-center justify-start min-h-[calc(100vh-60px)] px-6 pt-16 relative z-10">
+        <div className="w-full max-w-sm mx-auto md:bg-white/80 md:backdrop-blur-sm md:border md:border-gray-200 md:rounded-3xl md:shadow-xl md:p-8 md:max-w-md lg:max-w-lg">
+          {/* Logo */}
+          <div className="mb-8 text-left md:text-center">
+            <div className="relative inline-block mb-8">
+              <Image 
+                src="/Logos/logoblue.png" 
+                alt="MEGG Logo" 
+                height={80} 
+                width={80} 
+                className="object-contain"
               />
-            ))}
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-[#105588] mb-2 md:text-5xl md:font-bold lg:text-6xl lg:font-bold">Verify Email</h1>
+              <p className="text-gray-600 text-base md:text-lg">
+                Enter the 6-digit code sent to{" "}
+                <span className="font-medium text-[#105588]">{email || "name@example.com"}</span>
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex flex-col">
-              <span className="text-sm text-gray-500">Time remaining:</span>
-              <span className="text-lg font-medium">{formatTime(timeLeft)}</span>
+          {/* OTP Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* OTP Input Grid */}
+            <div className="flex justify-center gap-3 mb-8">
+              {otp.map((digit, index) => (
+                <input
+                  key={index}
+                  ref={(el) => (inputRefs.current[index] = el)}
+                  type="text"
+                  maxLength={1}
+                  value={digit}
+                  onChange={(e) => handleChange(e, index)}
+                  onKeyDown={(e) => handleKeyDown(e, index)}
+                  inputMode="numeric"
+                  disabled={isLoading}
+                  className="w-12 h-12 text-center bg-gray-100 rounded-2xl border border-transparent focus:bg-white focus:ring-2 focus:ring-[#ff4a08] focus:ring-opacity-50 focus:shadow-lg hover:bg-gray-50 transition-all duration-200 focus:border-[#ff4a08] text-lg font-semibold text-[#105588] disabled:opacity-50"
+                />
+              ))}
             </div>
 
-            <button
-              type="button"
-              onClick={handleResendOTP}
-              disabled={isLoading || timeLeft > 0}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-150 cursor-pointer disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              {isLoading ? "Sending..." : "Resend code"}
-            </button>
-          </div>
+            {/* Timer and Resend */}
+            <div className="bg-gray-100 rounded-2xl p-4 mb-6">
+              <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-xs font-medium uppercase tracking-wider text-gray-400 mb-1">Time Remaining</span>
+                  <span className="text-lg font-bold text-[#105588]">{formatTime(timeLeft)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleResendOTP}
+                  disabled={isLoading || resendCooldown > 0}
+                  className="px-4 py-2 bg-gradient-to-r from-[#ff4a08] to-[#f69664] text-white rounded-xl hover:from-[#f69664] hover:to-[#ff4a08] focus:outline-none focus:ring-2 focus:ring-[#ff4a08] focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm"
+                >
+                  {isLoading ? "Sending..." : resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
+                </button>
+              </div>
+            </div>
 
-          <div className="flex flex-col gap-4 mt-4">
-            <button
-              type="submit"
-              disabled={isLoading || timeLeft === 0}
-              className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 transition-colors duration-150 cursor-pointer text-white w-full disabled:bg-blue-300 disabled:cursor-not-allowed"
-            >
-              {isLoading ? "Verifying..." : "Verify email"}
-            </button>
+            {/* Verify Button */}
+            <div className="pt-4">
+              <button
+                type="submit"
+                disabled={isLoading || timeLeft === 0 || otp.some(digit => !digit)}
+                className="w-full bg-[#105588] text-white py-4 px-4 rounded-2xl hover:bg-[#0d4470] focus:outline-none focus:ring-2 focus:ring-[#ff4a08] focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed font-semibold text-lg relative overflow-hidden"
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Verifying...
+                  </div>
+                ) : (
+                  <>
+                    VERIFY EMAIL
+                    <div className="absolute bottom-0 left-0 h-1 bg-[#ff4a08] w-1/3 rounded-full"></div>
+                  </>
+                )}
+              </button>
+            </div>
 
-            <button
-              type="button"
-              onClick={viewSignIn}
-              className="border border-gray-300 hover:bg-gray-100 transition-colors duration-150 cursor-pointer rounded-lg flex items-center justify-center px-4 py-2 gap-2"
-            >
-              Go back to Sign in
-            </button>
-          </div>
-        </form>
+            {/* Back to Sign In */}
+            <div className="pt-4">
+              <button
+                type="button"
+                onClick={viewSignIn}
+                className="w-full bg-white border border-gray-200 text-gray-700 py-4 px-4 rounded-2xl hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#ff4a08] focus:ring-offset-2 transition-all duration-200 font-medium flex items-center justify-center shadow-sm"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Sign In
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
+      
+      {/* Enhanced Global Message Modal */}
+      {globalMessage && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl border border-white/20 transform animate-in fade-in duration-300 scale-95 animate-in">
+            {/* Icon based on message type */}
+            <div className="flex justify-center mb-6">
+              {globalMessage.toLowerCase().includes('success') || globalMessage.toLowerCase().includes('verified') ? (
+                // Success Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+              ) : globalMessage.toLowerCase().includes('error') || globalMessage.toLowerCase().includes('failed') || globalMessage.toLowerCase().includes('invalid') || globalMessage.toLowerCase().includes('expired') ? (
+                // Error Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </div>
+              ) : globalMessage.toLowerCase().includes('sent') || globalMessage.toLowerCase().includes('code') ? (
+                // Info Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-[#ff4a08] to-[#f69664] rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+              ) : (
+                // Default Info Icon
+                <div className="w-16 h-16 bg-gradient-to-br from-[#105588] to-[#0d4470] rounded-full flex items-center justify-center shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              )}
+            </div>
+
+            {/* Message Content */}
+            <div className="text-center mb-8">
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+                {globalMessage.toLowerCase().includes('success') || globalMessage.toLowerCase().includes('verified') ? 'Success!' :
+                 globalMessage.toLowerCase().includes('error') || globalMessage.toLowerCase().includes('failed') || globalMessage.toLowerCase().includes('invalid') || globalMessage.toLowerCase().includes('expired') ? 'Error' :
+                 globalMessage.toLowerCase().includes('sent') || globalMessage.toLowerCase().includes('code') ? 'Code Sent' : 'Information'}
+              </h3>
+              <p className="text-gray-700 leading-relaxed text-base">{globalMessage}</p>
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={() => setGlobalMessage("")}
+              className="w-full bg-gradient-to-r from-[#105588] to-[#0d4470] text-white py-4 px-6 rounded-2xl hover:from-[#0d4470] hover:to-[#0a3a5c] focus:outline-none focus:ring-4 focus:ring-[#105588]/30 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center group"
+            >
+              <span>Got it</span>
+              <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

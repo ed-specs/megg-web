@@ -18,4 +18,3 @@ export const verifyResetToken = (token, hash) => {
   const checkHash = createHash("sha256").update(token).digest("hex")
   return checkHash === hash
 }
-

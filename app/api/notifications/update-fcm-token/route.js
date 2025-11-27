@@ -1,43 +1,77 @@
-import { NextResponse } from "next/server"
-import { getAdminServices } from "../../../config/firebase-admin"
-import admin from "firebase-admin"
+import { doc, updateDoc, arrayUnion, getDoc } from "firebase/firestore"
+import { db } from "../../../config/firebaseConfig"
 
 export async function POST(request) {
   try {
-    const { userId, token } = await request.json()
+    const { accountId, fcmToken, deviceInfo } = await request.json()
 
-    if (!userId || !token) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "User ID and token are required",
-        },
-        { status: 400 },
+    if (!accountId || !fcmToken) {
+      return Response.json(
+        { error: "Account ID and FCM token are required" },
+        { status: 400 }
       )
     }
 
-    const { firestore } = getAdminServices()
+    const userRef = doc(db, "users", accountId)
+    
+    // Check if user exists
+    const userDoc = await getDoc(userRef)
+    if (!userDoc.exists()) {
+      return Response.json(
+        { error: "User not found" },
+        { status: 404 }
+      )
+    }
 
-    // Update the token in Firestore
-    await firestore.collection("fcmTokens").doc(userId).set(
-      {
-        token,
-        userId,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    )
+    const userData = userDoc.data()
+    const existingTokens = userData.fcmTokens || []
+    
+    // Check if token already exists
+    const tokenExists = existingTokens.some(tokenInfo => tokenInfo.token === fcmToken)
+    
+    if (tokenExists) {
+      // Update existing token's timestamp
+      const updatedTokens = existingTokens.map(tokenInfo => {
+        if (tokenInfo.token === fcmToken) {
+          return {
+            ...tokenInfo,
+            lastUpdated: new Date().toISOString(),
+            isActive: true
+          }
+        }
+        return tokenInfo
+      })
+      
+      await updateDoc(userRef, {
+        fcmTokens: updatedTokens,
+        lastTokenUpdate: new Date().toISOString()
+      })
+    } else {
+      // Add new token
+      const newTokenInfo = {
+        token: fcmToken,
+        deviceType: deviceInfo?.deviceType || 'web',
+        userAgent: deviceInfo?.userAgent || 'unknown',
+        lastUpdated: new Date().toISOString(),
+        isActive: true
+      }
 
-    return NextResponse.json({ success: true })
+      await updateDoc(userRef, {
+        fcmTokens: arrayUnion(newTokenInfo),
+        lastTokenUpdate: new Date().toISOString()
+      })
+    }
+
+    return Response.json({
+      success: true,
+      message: "FCM token updated successfully"
+    })
+
   } catch (error) {
     console.error("Error updating FCM token:", error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: error.message,
-      },
-      { status: 500 },
+    return Response.json(
+      { error: "Failed to update FCM token" },
+      { status: 500 }
     )
   }
 }
-
