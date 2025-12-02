@@ -1,0 +1,51 @@
+User Collection Fields (Example)
+Document ID(Customized in format MEGG-******): MEGG-679622
+accountId (string): "MEGG-679622"
+createdAt (string): "2025-12-01T10:02:30.389Z"
+deviceId (null): null
+email (string): "sonnypsarcia@gmail.com"
+fcmTokens (array)
+    0 (map)
+        deviceType (string): "web"
+        isActive (boolean): true
+        lastUpdated (string): "2025-12-01T13:38:02.196Z"
+        token (string): "dNZ5wg4SnIT15W80-c-nCs:APA91bG8gMvNZvDKThw39qxqosCADVRmFn8txjtg3RZr632Ruqd_kpwjKS1bJl6QW0EAk-gdrwRrptJX4brL5XxajnSqgxKo8K7dKLWtONEvn8C5ePV0edA"
+        userAgent (string): "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36 Edg/142.0.0.0"
+fullname (string): "Sonny Sarcia"
+lastLogin (string): "2025-12-01T14:09:35.226Z"
+lastTokenUpdate (string): "2025-12-01T13:38:02.196Z"
+otpExpiry (null): null
+phone (string): "09266301717"
+profileImageUrl (string): "https://firebasestorage.googleapis.com/v0/b/megg-tech.firebasestorage.app/o/profile-images%2FkSiCiD5IHFQGUoAUcA0bCqnlD4a2%2Fprofile_1764597923524.jpg?alt=media&token=4ff2ac71-f460-4454-981c-79d709b58b11"
+resetPasswordExpiry (string): "2025-12-01T11:10:53.997Z"
+resetPasswordToken (string): "b13353585baacc3bdd2f4489e43ba2e76b64faee771f74bdd2efabd16c45be47"
+role (string): "user"
+uid (string): "kSiCiD5IHFQGUoAUcA0bCqnlD4a2"
+username (string): "sonnysarcia"
+verificationOTP (null): null
+verified (boolean): true
+
+Notifications Collection Fields (Example)
+Document ID: NOTIF-(THE ACCOUNT ID)-(RANDOM 6 ALPHANEMURIC) example NOTIF-679622-2039AA
+createdAt (timestamp): October 29, 2025 at 10:57:26 PM UTC+8
+message (string): "You've updated your birthday"
+read (boolean): true
+type (string): "birthday_updated"
+accountId (string): "MEGG-679622"
+
+Batch Document Fields (Example)
+Document ID: BATCH-679622-0000
+accountId (string): "MEGG-896726"
+createdAt (string): "2025-10-30T04:16:26.501Z"
+id (string): "BATCH-679622-0000"
+name (string): "BATCH-679622-0000"
+stats (map)
+    crackEggs (number): 5
+    dirtyEggs (number): 0
+    goodEggs (number): 3
+    largeEggs (number): 0
+    mediumEggs (number): 0
+    smallEggs (number): 8
+    totalEggs (number): 8
+status (string): "active"
+updatedAt (string): "2025-10-30T04:40:52.698Z"

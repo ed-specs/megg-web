@@ -155,19 +155,19 @@ export function Navbar() {
   const isActive = (href) => pathname === href;
 
   const menus = [
-    { name: "Dashboard", href: "/admin/overview", icon: LayoutDashboard },
-    { name: "Inventory", href: "/admin/inventory", icon: Package },
+    { name: "Dashboard", href: "/dashboard/overview", icon: LayoutDashboard },
+    { name: "Inventory", href: "/dashboard/inventory", icon: Package },
   ];
 
   const historyLinks = [
     {
       name: "Sort history",
-      href: "/admin/history/sort",
+      href: "/dashboard/history/sort",
       icon: ArrowUpNarrowWide,
     },
     {
       name: "Defect history",
-      href: "/admin/history/defect",
+      href: "/dashboard/history/defect",
       icon: Bug,
     },
   ];
@@ -175,17 +175,17 @@ export function Navbar() {
   const manageAccountLinks = [
     {
       name: "Edit profile",
-      href: "/admin/settings/edit-profile",
+      href: "/dashboard/settings/edit-profile",
       icon: UserPen,
     },
     {
       name: "Change password",
-      href: "/admin/settings/change-password",
+      href: "/dashboard/settings/change-password",
       icon: KeyRound,
     },
     {
       name: "Preferences",
-      href: "/admin/settings/preferences",
+      href: "/dashboard/settings/preferences",
       icon: MonitorCog,
     },
   ];
@@ -204,7 +204,7 @@ export function Navbar() {
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold text-blue-900">MEGG</h1>
             <span className="text-gray-500 text-xs">
-              Smart Egg Quality & Defect Detection
+              Smart Egg Defect Detection and Sorting
             </span>
           </div>
         </div>
@@ -268,9 +268,9 @@ export function Navbar() {
           <div className="flex flex-col gap-2">
             <span className="text-sm font-bold text-gray-500">Management</span>
             <Link
-              href="/admin/profile"
+              href="/dashboard/profile"
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-150 ${
-                isActive("/admin/profile")
+                isActive("/dashboard/profile")
                   ? "bg-blue-500 text-white"
                   : "hover:bg-gray-100"
               }`}

@@ -10,16 +10,56 @@ import {
   deleteDoc,
   serverTimestamp,
   getDoc,
+  setDoc,
 } from "firebase/firestore"
+
+// Generate random 6 alphanumeric characters
+function generateRandomAlphanumeric() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let result = ''
+  for (let i = 0; i < 6; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
+}
+
+// Generate notification document ID in format: NOTIF-{accountId}-{random6alphanumeric}
+function generateNotificationId(accountId) {
+  const randomPart = generateRandomAlphanumeric()
+  return `NOTIF-${accountId}-${randomPart}`
+}
 
 // Check if notifications are enabled before creating
 async function checkNotificationSettings(userId, type) {
   try {
+    // Always allow login, password, settings, and profile-related notifications
+    if (type === "login" || 
+        type === "password_change" ||
+        type === "settings_change" ||
+        type.includes("password") ||
+        type.includes("settings") ||
+        type.includes("profile") || 
+        type.includes("name_updated") || 
+        type.includes("email_updated") || 
+        type.includes("phone_updated") || 
+        type.includes("address_updated") || 
+        type.includes("birthday_updated") || 
+        type.includes("age_updated") ||
+        type.includes("gender_updated") ||
+        type.includes("farm_")) {
+      return true
+    }
+
     const settingsRef = doc(db, "notificationSettings", userId)
     const settingsSnap = await getDoc(settingsRef)
 
     if (!settingsSnap.exists()) {
-      return false // No settings, default to disabled
+      // No settings exist - default to enabled for most types
+      // Only disable if it's a type that requires explicit settings
+      if (type.includes("defect") || type.includes("machine")) {
+        return false
+      }
+      return true // Default to enabled for login, password, profile changes, etc.
     }
 
     const settings = settingsSnap.data()
@@ -55,59 +95,133 @@ async function checkNotificationSettings(userId, type) {
     return true
   } catch (error) {
     console.error("Error checking notification settings:", error)
-    return false // Default to not sending on error
+    // On error, allow login notifications but block others
+    return type === "login"
   }
 }
 
 // Create a new notification
-export async function createNotification(userId, message, type, read = false) {
+// accountId: The account ID (e.g., "MEGG-679622")
+// message: The notification message
+// type: The notification type (e.g., "login", "password_change")
+// read: Whether the notification is read (default: false)
+export async function createNotification(accountId, message, type, read = false) {
   try {
     // Check if notifications are enabled for this user and type
-    const notificationsEnabled = await checkNotificationSettings(userId, type)
-
-    if (!notificationsEnabled) {
-      console.log(`Notifications disabled for user ${userId} and type ${type}`)
-      return null // Don't create notification if disabled
+    // Note: The user document ID is the accountId, so we can use it directly for settings check
+    // But we also need to check if the user has a uid field for settings lookup
+    let userId = null
+    let userDocId = null
+    try {
+      // Try to find user by accountId (document ID might be accountId)
+      const userDocRef = doc(db, "users", accountId)
+      const userDocSnap = await getDoc(userDocRef)
+      
+      if (userDocSnap.exists()) {
+        userDocId = accountId
+        const userData = userDocSnap.data()
+        // Use uid if available, otherwise use accountId as document ID
+        userId = userData.uid || accountId
+      } else {
+        // Try querying by accountId field
+        const userQuery = query(collection(db, "users"), where("accountId", "==", accountId))
+        const userSnapshot = await getDocs(userQuery)
+        if (!userSnapshot.empty) {
+          const userDoc = userSnapshot.docs[0]
+          userDocId = userDoc.id
+          const userData = userDoc.data()
+          userId = userData.uid || userDoc.id
+        }
+      }
+    } catch (error) {
+      console.error("Error finding user by accountId:", error)
     }
 
+    // Check notification settings if userId is found
+    // For login notifications, always create even if userId is not found
+    if (userId) {
+      const notificationsEnabled = await checkNotificationSettings(userId, type)
+      if (!notificationsEnabled) {
+        console.log(`Notifications disabled for account ${accountId} and type ${type}`)
+        return null // Don't create notification if disabled
+      }
+    } else if (type !== "login") {
+      // If userId not found and it's not a login notification, skip creation
+      console.log(`User not found for account ${accountId}, skipping notification creation for type ${type}`)
+      return null
+    }
+    // For login notifications, proceed even if userId is not found
+
+    // Generate custom document ID
+    const notificationId = generateNotificationId(accountId)
+
     const notificationData = {
-      userId,
+      accountId,
       message,
       type,
       read,
       createdAt: serverTimestamp(),
-      profileImage: "/default.png", // Default image
     }
 
-    // Get user profile image if available
-    try {
-      const userRef = doc(db, "users", userId)
-      const userSnap = await getDocs(query(collection(db, "users"), where("__name__", "==", userId)))
+    // Set icon based on notification type
+    const iconMap = {
+      "login": "login",
+      "password_change": "lock",
+      "settings_change": "settings",
+      "farm_info_updated": "farm",
+      "farm_name_updated": "farm",
+      "farm_address_updated": "farm",
+      "profile_image_added": "image",
+      "profile_image_removed": "image",
+      "profile_image_updated": "image",
+      "name_updated": "user",
+      "email_updated": "mail",
+      "phone_updated": "phone",
+      "address_updated": "map",
+      "birthday_updated": "calendar",
+      "age_updated": "calendar",
+      "gender_updated": "user",
+    }
 
-      if (!userSnap.empty) {
-        const userData = userSnap.docs[0].data()
-        if (userData.profileImageUrl) {
-          notificationData.profileImage = userData.profileImageUrl
+    // Check if this notification type should use an icon
+    if (iconMap[type]) {
+      notificationData.icon = iconMap[type]
+    } else {
+      // For other types, try to get user profile image if available
+      try {
+        const userQuery = query(collection(db, "users"), where("accountId", "==", accountId))
+        const userSnapshot = await getDocs(userQuery)
+        if (!userSnapshot.empty) {
+          const userData = userSnapshot.docs[0].data()
+          if (userData.profileImageUrl) {
+            notificationData.profileImage = userData.profileImageUrl
+          }
         }
+      } catch (error) {
+        console.error("Error getting user profile image:", error)
       }
-    } catch (error) {
-      console.error("Error getting user profile image:", error)
     }
 
-    const docRef = await addDoc(collection(db, "notifications"), notificationData)
-    return docRef.id
+    // Create notification with custom document ID
+    const notificationRef = doc(db, "notifications", notificationId)
+    await setDoc(notificationRef, notificationData)
+    
+    console.log(`✅ Notification created: ${notificationId} for account ${accountId}`)
+    console.log(`   Message: ${message}, Type: ${type}`)
+    
+    return notificationId
   } catch (error) {
-    console.error("Error creating notification:", error)
+    console.error(`❌ Error creating notification for account ${accountId}:`, error)
+    console.error(`   Error details:`, error.message, error.code)
     throw error
   }
 }
 
-// Get notifications for a user
-export async function getUserNotifications(userId, limitCount = 10) {
+// Get notifications for a user by accountId
+export async function getUserNotifications(accountId, limitCount = 10) {
   try {
-    // Modified query to avoid requiring the composite index
-    // Instead of using orderBy with where, we'll just filter by userId
-    const q = query(collection(db, "notifications"), where("userId", "==", userId))
+    // Query notifications by accountId
+    const q = query(collection(db, "notifications"), where("accountId", "==", accountId))
 
     const querySnapshot = await getDocs(q)
     let notifications = []
@@ -117,10 +231,14 @@ export async function getUserNotifications(userId, limitCount = 10) {
       notifications.push({
         id: doc.id,
         message: data.message,
-        read: data.read,
+        read: data.read || false,
         profileImage: data.profileImage || "/default.png",
+        icon: data.icon || null, // Include icon field for login notifications
         type: data.type,
-        createdAt: data.createdAt ? new Date(data.createdAt.toDate()).toISOString() : new Date().toISOString(),
+        accountId: data.accountId,
+        createdAt: data.createdAt 
+          ? (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : new Date(data.createdAt).toISOString())
+          : new Date().toISOString(),
       })
     })
 
@@ -168,9 +286,9 @@ export async function deleteNotification(notificationId) {
 }
 
 // Mark all notifications as read
-export async function markAllNotificationsAsRead(userId) {
+export async function markAllNotificationsAsRead(accountId) {
   try {
-    const q = query(collection(db, "notifications"), where("userId", "==", userId), where("read", "==", false))
+    const q = query(collection(db, "notifications"), where("accountId", "==", accountId), where("read", "==", false))
 
     const querySnapshot = await getDocs(q)
 
@@ -189,9 +307,9 @@ export async function markAllNotificationsAsRead(userId) {
 }
 
 // Get unread notification count
-export async function getUnreadNotificationCount(userId) {
+export async function getUnreadNotificationCount(accountId) {
   try {
-    const q = query(collection(db, "notifications"), where("userId", "==", userId), where("read", "==", false))
+    const q = query(collection(db, "notifications"), where("accountId", "==", accountId), where("read", "==", false))
 
     const querySnapshot = await getDocs(q)
     return querySnapshot.size

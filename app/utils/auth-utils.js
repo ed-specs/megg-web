@@ -83,6 +83,39 @@ export const debugAuthState = () => {
 }
 
 /**
+ * Get stored user data from localStorage
+ * @returns {Object|null} The stored user data or null if not found
+ */
+export const getStoredUser = () => {
+  try {
+    const storedUser = localStorage.getItem("user")
+    if (storedUser) {
+      return JSON.parse(storedUser)
+    }
+    
+    // Also check custom auth user
+    const customAuthUser = localStorage.getItem("customAuthUser")
+    if (customAuthUser) {
+      return JSON.parse(customAuthUser)
+    }
+    
+    return null
+  } catch (error) {
+    console.error("Error parsing stored user data:", error)
+    return null
+  }
+}
+
+/**
+ * Get user's account ID from stored data
+ * @returns {string|null} The account ID or null if not found
+ */
+export const getUserAccountId = () => {
+  const storedUser = getStoredUser()
+  return storedUser?.accountId || null
+}
+
+/**
  * Get user information for debugging machine linking issues
  */
 export const debugUserInfo = async () => {
@@ -97,6 +130,7 @@ export const debugUserInfo = async () => {
   console.log("User Email:", user.email)
   console.log("Is Custom Auth:", user.isCustomAuth)
   console.log("User Object:", user)
+  console.log("Stored User Data:", getStoredUser())
   console.log("========================")
   
   return user

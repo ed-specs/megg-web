@@ -161,14 +161,14 @@ export  function Header({ setSidebarOpen }) {
 
   const pageName =
     {
-      "/admin/overview": "Dashboard",
-      "/admin/inventory": "Inventory",
-      "/admin/history/sort": "Sort History",
-      "/admin/history/defect": "Defect History",
-      "/admin/profile": "Profile",
-      "/admin/settings/edit-profile": "Edit Profile",
-      "/admin/settings/change-password": "Change Password",
-      "/admin/settings/preferences": "Preferences",
+      "/dashboard/overview": "Dashboard",
+      "/dashboard/inventory": "Inventory",
+      "/dashboard/history/sort": "Sort History",
+      "/dashboard/history/defect": "Defect History",
+      "/dashboard/profile": "Profile",
+      "/dashboard/settings/edit-profile": "Edit Profile",
+      "/dashboard/settings/change-password": "Change Password",
+      "/dashboard/settings/preferences": "Preferences",
     }[pathname] || "Page";
   return (
     <div className="">

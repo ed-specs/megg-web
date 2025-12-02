@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Bell, Ellipsis, Trash, Check } from "lucide-react"
+import { Bell, Ellipsis, Trash, Check, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { auth } from "../../config/firebaseConfig"
@@ -197,14 +197,56 @@ export default function NotificationMobile({ notificationOpen, setNotificationOp
                           className={`${notification.read ? "bg-white" : "bg-blue-50"} transition-colors duration-150 hover:bg-gray-300/20 group p-4 flex items-center justify-between w-full`}
                         >
                           <div className="flex items-center gap-4">
-                            <div className="relative rounded-full w-12 h-12 border border-blue-500 overflow-hidden">
-                              <Image
-                                src={notification.profileImage || "/default.png"}
-                                alt="Profile"
-                                fill
-                                className="object-cover"
-                                priority
-                              />
+                            <div className="relative rounded-full w-12 h-12 border border-blue-500 overflow-hidden flex-shrink-0">
+                              {notification.icon === "login" ? (
+                                <div className="w-12 h-12 bg-[#105588] flex items-center justify-center rounded-full">
+                                  <LogIn className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "farm" ? (
+                                <div className="w-12 h-12 bg-green-500 flex items-center justify-center rounded-full">
+                                  <Building2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "user" ? (
+                                <div className="w-12 h-12 bg-blue-500 flex items-center justify-center rounded-full">
+                                  <User className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "mail" ? (
+                                <div className="w-12 h-12 bg-purple-500 flex items-center justify-center rounded-full">
+                                  <Mail className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "phone" ? (
+                                <div className="w-12 h-12 bg-teal-500 flex items-center justify-center rounded-full">
+                                  <Phone className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "map" ? (
+                                <div className="w-12 h-12 bg-orange-500 flex items-center justify-center rounded-full">
+                                  <MapPin className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "calendar" ? (
+                                <div className="w-12 h-12 bg-pink-500 flex items-center justify-center rounded-full">
+                                  <Calendar className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "image" ? (
+                                <div className="w-12 h-12 bg-indigo-500 flex items-center justify-center rounded-full">
+                                  <ImageIcon className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "lock" ? (
+                                <div className="w-12 h-12 bg-red-500 flex items-center justify-center rounded-full">
+                                  <Lock className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notification.icon === "settings" ? (
+                                <div className="w-12 h-12 bg-gray-500 flex items-center justify-center rounded-full">
+                                  <Settings className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : (
+                                <Image
+                                  src={notification.profileImage || "/default.png"}
+                                  alt="Profile"
+                                  fill
+                                  className="object-cover"
+                                  priority
+                                />
+                              )}
                             </div>
                             <div className="flex flex-col">
                               <span className="text-start">{notification.message}</span>

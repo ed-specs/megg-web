@@ -1,5 +1,5 @@
 import { getAdminServices } from "../../../config/firebase-admin"
-import { collection, query, where, getDocs } from "firebase/firestore"
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore"
 import { db } from "../../../config/firebaseConfig"
 
 export async function POST(request) {
@@ -25,6 +25,29 @@ export async function POST(request) {
 
       if (!querySnapshot.empty) {
         const userData = querySnapshot.docs[0].data()
+        
+        // Check if push notifications are enabled for this user
+        // Try both accountId and uid as document ID
+        let settingsSnap = await getDoc(doc(db, "notificationSettings", accountId))
+        if (!settingsSnap.exists() && userData.uid) {
+          settingsSnap = await getDoc(doc(db, "notificationSettings", userData.uid))
+        }
+        
+        if (settingsSnap.exists()) {
+          const settings = settingsSnap.data()
+          // Check if push notifications are disabled
+          if (settings.pushNotificationsEnabled === false) {
+            console.log(`Push notifications disabled for user ${accountId}`)
+            return Response.json(
+              { error: "Push notifications are disabled for this user", skipped: true },
+              { status: 200 } // Return 200 but indicate it was skipped
+            )
+          }
+        } else {
+          // No settings found, default to enabled (for backward compatibility)
+          console.log(`No notification settings found for user ${accountId}, defaulting to enabled`)
+        }
+        
         const fcmTokens = userData.fcmTokens || []
         
         // Extract active tokens
