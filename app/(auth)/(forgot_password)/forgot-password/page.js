@@ -7,7 +7,7 @@ import { db } from "../../../config/firebaseConfig"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import Image from "next/image"
 import { Mail } from "lucide-react"
-// Removed toast imports - reverting to modal responses
+import AuthModal from "../../components/AuthModal"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
@@ -211,58 +211,11 @@ export default function ForgotPasswordPage() {
         </div>
       </div>
       
-      {/* Enhanced Global Message Modal */}
-      {globalMessage && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-lg w-full mx-4 shadow-2xl border border-white/20 transform animate-in fade-in duration-300 scale-95 animate-in">
-            {/* Icon based on message type */}
-            <div className="flex justify-center mb-6">
-              {globalMessage.toLowerCase().includes('success') || globalMessage.toLowerCase().includes('sent') ? (
-                // Success Icon
-                <div className="w-16 h-16 bg-gradient-to-br from-green-400 to-green-600 rounded-full flex items-center justify-center shadow-lg">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 4.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-              ) : globalMessage.toLowerCase().includes('error') || globalMessage.toLowerCase().includes('failed') ? (
-                // Error Icon
-                <div className="w-16 h-16 bg-gradient-to-br from-red-400 to-red-600 rounded-full flex items-center justify-center shadow-lg">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </div>
-              ) : (
-                // Default Info Icon
-                <div className="w-16 h-16 bg-gradient-to-br from-[#105588] to-[#0d4470] rounded-full flex items-center justify-center shadow-lg">
-                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              )}
-            </div>
-
-            {/* Message Content */}
-            <div className="text-center mb-8">
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
-                {globalMessage.toLowerCase().includes('success') || globalMessage.toLowerCase().includes('sent') ? 'Email Sent!' :
-                 globalMessage.toLowerCase().includes('error') || globalMessage.toLowerCase().includes('failed') ? 'Error' : 'Information'}
-              </h3>
-              <p className="text-gray-700 leading-relaxed text-base">{globalMessage}</p>
-            </div>
-
-            {/* Action Button */}
-            <button
-              onClick={() => setGlobalMessage("")}
-              className="w-full bg-gradient-to-r from-[#105588] to-[#0d4470] text-white py-4 px-6 rounded-2xl hover:from-[#0d4470] hover:to-[#0a3a5c] focus:outline-none focus:ring-4 focus:ring-[#105588]/30 transition-all duration-300 font-semibold text-lg shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center group"
-            >
-              <span>Got it</span>
-              <svg className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Global Message Modal */}
+      <AuthModal
+        message={globalMessage}
+        onClose={() => setGlobalMessage("")}
+      />
     </div>
   )
 }

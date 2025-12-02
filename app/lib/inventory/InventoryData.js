@@ -1,6 +1,6 @@
-import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore"
+import { collection, getDocs, query, where, doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "../../config/firebaseConfig"
-import { getCurrentUser } from "../../utils/auth-utils"
+import { getUserAccountId, getCurrentUser } from "../../utils/auth-utils"
 
 // Helper: robustly convert Firestore Timestamp or JS date-like to Date
 const tsToDate = (ts) => {
@@ -27,27 +27,65 @@ export const getUserLinkedMachines = async () => {
 // Helper: get current user's accountId
 const getCurrentAccountId = async () => {
   try {
-    const user = getCurrentUser()
-    if (!user) {
-      console.warn("InventoryData: No authenticated user found (yet)")
-      return null
-    }
-
-    const userDocRef = doc(db, "users", user.uid)
-    const userDoc = await getDoc(userDocRef)
-    if (!userDoc.exists()) {
-      console.warn("InventoryData: User document not found for user:", user.uid)
-      return null
-    }
-
-    const data = userDoc.data()
-    const accountId = data?.accountId || null
+    let accountId = getUserAccountId()
+    
     if (!accountId) {
-      console.warn("InventoryData: accountId missing on user document", user.uid)
+      // Try to parse and extract accountId manually
+      const userStr = localStorage.getItem("user")
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr)
+          accountId = user?.accountId
+        } catch (e) {
+          // Silent fail
+        }
+      }
+      
+      if (!accountId) {
+        const customAuthUserStr = localStorage.getItem("customAuthUser")
+        if (customAuthUserStr) {
+          try {
+            const customUser = JSON.parse(customAuthUserStr)
+            accountId = customUser?.accountId
+          } catch (e) {
+            // Silent fail
+          }
+        }
+      }
+      
+      // If still no accountId, try to get it from Firestore user document
+      if (!accountId) {
+        try {
+          const user = getCurrentUser()
+          if (user?.uid) {
+            const userDocRef = doc(db, "users", user.uid)
+            const userDoc = await getDoc(userDocRef)
+            if (userDoc.exists()) {
+              const userData = userDoc.data()
+              accountId = userData?.accountId
+            }
+            
+            if (!accountId) {
+              const usersQuery = query(collection(db, "users"), where("uid", "==", user.uid))
+              const usersSnapshot = await getDocs(usersQuery)
+              if (!usersSnapshot.empty) {
+                const userData = usersSnapshot.docs[0].data()
+                accountId = userData?.accountId
+              }
+            }
+          }
+        } catch (e) {
+          // Silent fail
+        }
+      }
+      
+      if (!accountId) {
+        return null
+      }
     }
-    return accountId
+    
+    return String(accountId).trim()
   } catch (error) {
-    console.error("InventoryData: Error getting current accountId:", error)
     return null
   }
 }
@@ -61,12 +99,12 @@ export const getMachineLinkedInventoryData = async () => {
     // New model: use current user's accountId and read aggregate batch docs
     const accountId = await getCurrentAccountId()
     if (!accountId) {
-      console.log("InventoryData: No accountId; returning empty inventory")
       return []
     }
 
+    const normalizedAccountId = accountId.trim()
     const batchesRef = collection(db, "batches")
-    const qBatches = query(batchesRef, where("accountId", "==", accountId))
+    const qBatches = query(batchesRef, where("accountId", "==", normalizedAccountId))
     const snapshot = await getDocs(qBatches)
 
     const inventoryData = snapshot.docs.map((d) => {
@@ -75,10 +113,13 @@ export const getMachineLinkedInventoryData = async () => {
       const created = tsToDate(data?.createdAt)
       const updated = tsToDate(data?.updatedAt) || created
 
+      // Use fields from Batch collection: smallEggs, mediumEggs, largeEggs, goodEggs, crackEggs, dirtyEggs, totalEggs
       const small = Number(stats.smallEggs || 0)
       const med = Number(stats.mediumEggs || 0)
       const large = Number(stats.largeEggs || 0)
-      const defect = Number((stats.badEggs || 0) + (stats.dirtyEggs || 0))
+      const crackEggs = Number(stats.crackEggs || 0)
+      const dirtyEggs = Number(stats.dirtyEggs || 0)
+      const defect = crackEggs + dirtyEggs
       const goodEggs = typeof stats.goodEggs === 'number' ? Number(stats.goodEggs) : (small + med + large)
 
       // Determine most common size among Small/Medium/Large
@@ -98,8 +139,11 @@ export const getMachineLinkedInventoryData = async () => {
 
       const totalEggs = Number(stats.totalEggs || small + med + large + defect)
 
+      // Use id, name, or document ID for batchNumber (in order of preference)
+      const batchNumber = data?.id || data?.name || d.id
+
       return {
-        batchNumber: data?.id || d.id,
+        batchNumber,
         totalEggs,
         totalSort: goodEggs,
         goodEggs,
@@ -110,6 +154,9 @@ export const getMachineLinkedInventoryData = async () => {
         eggSizes,
         logs: [],
         sizeCounts: eggSizes,
+        status: (data?.status || "active").toLowerCase() === "active" ? "active" : "not active",
+        createdAt: created.toISOString(),
+        updatedAt: updated.toISOString(),
       }
     })
 
@@ -124,49 +171,112 @@ export const getMachineLinkedInventoryData = async () => {
 }
 
 /**
- * Get detailed logs for a specific batch only for machines linked to the current user
- * @param {string} batchId - The batch ID to get details for
- * @returns {Promise<Array>} Array of weight logs for the specific batch
+ * Get detailed stats for a specific batch only for machines linked to the current user
+ * @param {string} batchId - The batch ID (id, name, or document ID) to get details for
+ * @returns {Promise<Object>} Object containing batch statistics and breakdown
  */
 export const getMachineLinkedBatchDetails = async (batchId) => {
   try {
     const accountId = await getCurrentAccountId()
-    if (!accountId) return []
+    if (!accountId) return null
 
-    // New model: query eggs for this account and batch
-    const eggsRef = collection(db, "eggs")
-    const qEggs = query(eggsRef, where("accountId", "==", accountId), where("batchId", "==", batchId))
-    const snapshot = await getDocs(qEggs)
+    // Query batch by accountId and match by id, name, or document ID
+    const batchesRef = collection(db, "batches")
+    const qBatches = query(batchesRef, where("accountId", "==", accountId))
+    const snapshot = await getDocs(qBatches)
 
-    const logs = snapshot.docs.map((d) => {
+    // Find the batch that matches the batchId (could be id, name, or document ID)
+    const batchDoc = snapshot.docs.find((d) => {
       const data = d.data()
-      const created = data?.createdAt ? new Date(data.createdAt) : new Date()
-
-      // Determine size and defect
-      let size = (data?.size || "").toString().toLowerCase()
-      const quality = (data?.quality || "").toString().toLowerCase()
-      let mappedSize = "Unknown"
-      if (["small", "medium", "large"].includes(size)) {
-        mappedSize = size.charAt(0).toUpperCase() + size.slice(1)
-      }
-      if (quality && quality !== "good") {
-        mappedSize = "Defect"
-      }
-
-      return {
-        id: d.id,
-        ...data,
-        timestamp: created,
-        size: mappedSize,
-      }
+      return data?.id === batchId || data?.name === batchId || d.id === batchId
     })
 
-    // Sort by timestamp (newest first)
-    logs.sort((a, b) => b.timestamp - a.timestamp)
-    return logs
+    if (!batchDoc) {
+      return null
+    }
+
+    const data = batchDoc.data()
+    const stats = data?.stats || {}
+    const created = tsToDate(data?.createdAt)
+    const updated = tsToDate(data?.updatedAt) || created
+
+    // Use fields from Batch collection
+    const small = Number(stats.smallEggs || 0)
+    const med = Number(stats.mediumEggs || 0)
+    const large = Number(stats.largeEggs || 0)
+    const crackEggs = Number(stats.crackEggs || 0)
+    const dirtyEggs = Number(stats.dirtyEggs || 0)
+    const defect = crackEggs + dirtyEggs
+    const goodEggs = typeof stats.goodEggs === 'number' ? Number(stats.goodEggs) : (small + med + large)
+    const totalEggs = Number(stats.totalEggs || small + med + large + defect)
+
+    // Size breakdown for overview cards
+    const sizeBreakdown = {
+      Small: small,
+      Medium: med,
+      Large: large,
+      Defect: defect,
+    }
+
+    return {
+      totalEggs,
+      goodEggs,
+      totalSort: goodEggs,
+      defectEggs: defect,
+      timeRange: `${created.toLocaleTimeString()} - ${updated.toLocaleTimeString()}`,
+      sizeBreakdown,
+      status: (data?.status || "active").toLowerCase() === "active" ? "active" : "not active",
+      createdAt: created,
+      updatedAt: updated,
+    }
   } catch (error) {
-    console.error("InventoryData: Error getting batch details from eggs:", error)
-    return []
+    console.error("InventoryData: Error getting batch details from batches:", error)
+    return null
+  }
+}
+
+/**
+ * Update batch status for a specific batch
+ * @param {string} batchId - The batch ID (id, name, or document ID) to update
+ * @param {string} status - The new status ("active" or "not active")
+ * @returns {Promise<boolean>} True if successful, false otherwise
+ */
+export const updateBatchStatus = async (batchId, status) => {
+  try {
+    const accountId = await getCurrentAccountId()
+    if (!accountId) {
+      console.error("InventoryData: No accountId found")
+      return false
+    }
+
+    // Query batch by accountId and match by id, name, or document ID
+    const batchesRef = collection(db, "batches")
+    const qBatches = query(batchesRef, where("accountId", "==", accountId))
+    const snapshot = await getDocs(qBatches)
+
+    // Find the batch that matches the batchId
+    const batchDoc = snapshot.docs.find((d) => {
+      const data = d.data()
+      return data?.id === batchId || data?.name === batchId || d.id === batchId
+    })
+
+    if (!batchDoc) {
+      console.error("InventoryData: Batch not found:", batchId)
+      return false
+    }
+
+    // Update the batch status and updatedAt timestamp
+    const batchRef = doc(db, "batches", batchDoc.id)
+    await updateDoc(batchRef, {
+      status: status,
+      updatedAt: new Date().toISOString(),
+    })
+
+    console.log(`InventoryData: Batch ${batchId} status updated to ${status}`)
+    return true
+  } catch (error) {
+    console.error("InventoryData: Error updating batch status:", error)
+    return false
   }
 }
 
@@ -182,7 +292,10 @@ export const getMachineLinkedBatchIds = async () => {
     const batchesRef = collection(db, "batches")
     const qBatches = query(batchesRef, where("accountId", "==", accountId))
     const snapshot = await getDocs(qBatches)
-    return snapshot.docs.map((d) => d.data()?.id || d.id)
+    return snapshot.docs.map((d) => {
+      const data = d.data()
+      return data?.id || data?.name || d.id
+    })
   } catch (error) {
     console.error("InventoryData: Error getting batch IDs from batches:", error)
     return []

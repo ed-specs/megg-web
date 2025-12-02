@@ -70,6 +70,10 @@ export default {
           yellow: "#ecb662",
         },
       },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        inter: ['Inter', 'sans-serif'],
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],

@@ -14,10 +14,10 @@ export  function Sidebar({ mobileSidebarOpen, toggleMobileSidebar }) {
   const pathname = usePathname();
 
   const navItems = [
-    { href: "/admin/overview", icon: LayoutDashboard, label: "Overview" },
-    { href: "/admin/inventory", icon: Package, label: "Inventory" },
-    { href: "/admin/history", icon: History, label: "History" },
-    { href: "/admin/settings", icon: Settings, label: "Settings" },
+    { href: "/dashboard/overview", icon: LayoutDashboard, label: "Overview" },
+    { href: "/dashboard/inventory", icon: Package, label: "Inventory" },
+    { href: "/dashboard/history", icon: History, label: "History" },
+    { href: "/dashboard/settings", icon: Settings, label: "Settings" },
   ];
 
   const isActive = (href) => pathname === href;

@@ -1,14 +1,14 @@
 "use client"
 import { useState, useEffect } from "react"
 import Image from "next/image"
-import { Ellipsis, Check, Trash, Bell, BellOff } from "lucide-react"
+import { Ellipsis, Check, Trash, Bell, BellOff, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { auth } from "../../config/firebaseConfig"
 import { getUserNotifications, markNotificationAsRead, deleteNotification } from "../../lib/notifications/NotificationsService.js"
+import { getUserAccountId } from "../../utils/auth-utils"
 
 export default function Notifications() {
   const [activeAction, setActiveAction] = useState(null)
-  const [showAll, setShowAll] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -29,7 +29,7 @@ export default function Notifications() {
         .catch((error) => console.error("Error marking notification as read:", error))
     }
 
-    router.push("/admin/notifications")
+    router.push("/dashboard/notifications")
   }
 
   const handleMarkAsRead = async (notificationId, e) => {
@@ -72,9 +72,9 @@ export default function Notifications() {
   useEffect(() => {
     const loadNotifications = async () => {
       try {
-        const user = auth.currentUser
-        if (user) {
-          const userNotifications = await getUserNotifications(user.uid)
+        const accountId = getUserAccountId()
+        if (accountId) {
+          const userNotifications = await getUserNotifications(accountId)
           setNotifications(userNotifications)
         }
       } catch (error) {
@@ -118,7 +118,7 @@ export default function Notifications() {
             <Bell className="w-5 h-5" />
             <h1 className="text-lg font-medium">Notifications</h1>
           </div>
-          {notifications.length > 0 && notifications.length > 5 && !showAll && (
+          {notifications.length > 5 && (
             <div className="rounded-full w-8 h-8 flex items-center justify-center text-sm bg-blue-500 text-white">
               {notifications.length > 99 ? "+99" : notifications.length - 5}
             </div>
@@ -137,7 +137,7 @@ export default function Notifications() {
         ) : (
           <>
             <div className="divide-y overflow-visible">
-              {(showAll ? notifications : notifications.slice(0, 5)).map((notification, index, array) => {
+              {notifications.slice(0, 5).map((notification, index, array) => {
                 const isLast = index === array.length - 1
 
                 return (
@@ -148,14 +148,56 @@ export default function Notifications() {
                       className={`${notification.read ? "bg-white" : "bg-blue-50"} transition-colors duration-150 hover:bg-gray-300/20 group p-4 flex items-center justify-between w-full`}
                     >
                       <div className="flex items-center gap-4">
-                        <div className="relative rounded-full w-12 h-12 border border-blue-500 overflow-hidden">
-                          <Image
-                            src={notification.profileImage || "/default.png"}
-                            alt="Profile"
-                            fill
-                            className="object-cover"
-                            priority
-                          />
+                        <div className="relative rounded-full w-12 h-12 border border-blue-500 overflow-hidden flex-shrink-0">
+                          {notification.icon === "login" ? (
+                            <div className="w-12 h-12 bg-[#105588] flex items-center justify-center rounded-full">
+                              <LogIn className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "farm" ? (
+                            <div className="w-12 h-12 bg-green-500 flex items-center justify-center rounded-full">
+                              <Building2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "user" ? (
+                            <div className="w-12 h-12 bg-blue-500 flex items-center justify-center rounded-full">
+                              <User className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "mail" ? (
+                            <div className="w-12 h-12 bg-purple-500 flex items-center justify-center rounded-full">
+                              <Mail className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "phone" ? (
+                            <div className="w-12 h-12 bg-teal-500 flex items-center justify-center rounded-full">
+                              <Phone className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "map" ? (
+                            <div className="w-12 h-12 bg-orange-500 flex items-center justify-center rounded-full">
+                              <MapPin className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "calendar" ? (
+                            <div className="w-12 h-12 bg-pink-500 flex items-center justify-center rounded-full">
+                              <Calendar className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "image" ? (
+                            <div className="w-12 h-12 bg-indigo-500 flex items-center justify-center rounded-full">
+                              <ImageIcon className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "lock" ? (
+                            <div className="w-12 h-12 bg-red-500 flex items-center justify-center rounded-full">
+                              <Lock className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : notification.icon === "settings" ? (
+                            <div className="w-12 h-12 bg-gray-500 flex items-center justify-center rounded-full">
+                              <Settings className="w-5 h-5 text-white" strokeWidth={2.5} />
+                            </div>
+                          ) : (
+                            <Image
+                              src={notification.profileImage || "/default.png"}
+                              alt="Profile"
+                              fill
+                              className="object-cover"
+                              priority
+                            />
+                          )}
                         </div>
                         <div className="flex flex-col">
                           <span className="text-start">{notification.message}</span>
@@ -206,9 +248,9 @@ export default function Notifications() {
             {notifications.length > 5 && (
               <button
                 className="w-full p-4 text-blue-500 hover:bg-gray-300/20 text-center font-medium"
-                onClick={() => setShowAll(!showAll)}
+                onClick={() => router.push("/dashboard/notifications")}
               >
-                {showAll ? "Show Less" : "See All"}
+                See All
               </button>
             )}
           </>

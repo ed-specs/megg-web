@@ -3,8 +3,9 @@ import html2canvas from 'html2canvas'
 import * as XLSX from 'xlsx'
 import { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, AlignmentType, ImageRun } from 'docx'
 import { saveAs } from 'file-saver'
-import { collection, getDocs } from 'firebase/firestore'
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore'
 import { db } from '../config/firebaseConfig'
+import { getCurrentUser, getUserAccountId } from './auth-utils'
 
 // Utility function to load image with CORS handling
 const loadImageWithFallback = async (imageUrl) => {
@@ -89,6 +90,44 @@ async function getImageBase64(url) {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+// Helper to get current user's farm information from Firestore
+async function getUserFarmInfo() {
+  try {
+    const user = getCurrentUser();
+    const accountId = getUserAccountId();
+    const docId = accountId || user?.uid;
+    
+    if (!docId) {
+      return {
+        farmName: null,
+        farmAddress: null
+      };
+    }
+    
+    const userDocRef = doc(db, "users", docId);
+    const userDoc = await getDoc(userDocRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      return {
+        farmName: userData.farmName || null,
+        farmAddress: userData.farmAddress || null
+      };
+    }
+    
+    return {
+      farmName: null,
+      farmAddress: null
+    };
+  } catch (error) {
+    console.error("Error fetching user farm info:", error);
+    return {
+      farmName: null,
+      farmAddress: null
+    };
+  }
 }
 
 // Export to CSV
@@ -1206,5 +1245,536 @@ export const exportChart = async (chartRef, format, filename) => {
   } else {
     console.warn('Chart can only be exported as image')
   }
+}
+
+// Inventory Batch List Export
+export const exportInventoryBatches = async (batches, format) => {
+  if (!batches || batches.length === 0) {
+    console.warn('No batches to export')
+    return
+  }
+
+  // Calculate defect rate for each batch
+  const calculateDefectRate = (batch) => {
+    if (!batch.totalEggs || batch.totalEggs === 0) return 0
+    const defectEggs = batch.eggSizes?.Defect || 0
+    return parseFloat(((defectEggs / batch.totalEggs) * 100).toFixed(2))
+  }
+
+  const exportData = batches.map(batch => ({
+    batchNumber: batch.batchNumber || 'Unknown',
+    totalEggs: batch.totalEggs || 0,
+    totalSort: batch.totalSort || batch.goodEggs || 0,
+    defectEggs: batch.eggSizes?.Defect || 0,
+    defectRate: calculateDefectRate(batch),
+    smallEggs: batch.eggSizes?.Small || 0,
+    mediumEggs: batch.eggSizes?.Medium || 0,
+    largeEggs: batch.eggSizes?.Large || 0,
+    status: (batch.status || 'active').toLowerCase() === 'active' ? 'Active' : 'Not Active',
+    fromDate: batch.fromDate || 'N/A',
+    toDate: batch.toDate || 'N/A',
+    createdAt: batch.createdAt ? new Date(batch.createdAt).toLocaleString() : 'N/A',
+  }))
+
+  const columns = [
+    { key: 'batchNumber', header: 'Batch Number' },
+    { key: 'totalEggs', header: 'Total Eggs' },
+    { key: 'totalSort', header: 'Total Sort' },
+    { key: 'defectEggs', header: 'Defect Eggs' },
+    { key: 'defectRate', header: 'Defect Rate (%)' },
+    { key: 'smallEggs', header: 'Small Eggs' },
+    { key: 'mediumEggs', header: 'Medium Eggs' },
+    { key: 'largeEggs', header: 'Large Eggs' },
+    { key: 'status', header: 'Status' },
+    { key: 'fromDate', header: 'From Date' },
+    { key: 'toDate', header: 'To Date' },
+    { key: 'createdAt', header: 'Created At' }
+  ]
+
+  const filename = `inventory-batches-${new Date().toISOString().split('T')[0]}`
+  const title = 'Inventory Batches Report'
+
+  switch (format) {
+    case 'csv':
+      exportToCSV(exportData, filename)
+      break
+    case 'excel':
+      exportToExcel(exportData, filename, 'Inventory Batches')
+      break
+    case 'pdf':
+      await exportInventoryBatchesPDF(batches, filename)
+      break
+    default:
+      console.warn('Unknown export format:', format)
+  }
+}
+
+// Improved PDF export specifically for inventory batches
+const exportInventoryBatchesPDF = async (batches, filename) => {
+  const doc = new jsPDF('landscape'); // Use landscape for better table layout
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Calculate defect rate helper function
+  const calculateDefectRate = (batch) => {
+    if (!batch.totalEggs || batch.totalEggs === 0) return 0;
+    const defectEggs = batch.eggSizes?.Defect || 0;
+    return parseFloat(((defectEggs / batch.totalEggs) * 100).toFixed(2));
+  };
+
+  // Get user farm info and load MEGG logo
+  const [farmInfo, meggLogo] = await Promise.all([
+    getUserFarmInfo(),
+    getImageBase64('/logo.png'),
+  ]);
+
+  // Calculate summary statistics
+  const totalBatches = batches.length;
+  const totalEggs = batches.reduce((sum, b) => sum + (b.totalEggs || 0), 0);
+  const totalDefects = batches.reduce((sum, b) => sum + (b.eggSizes?.Defect || 0), 0);
+  const totalGood = batches.reduce((sum, b) => sum + (b.totalSort || b.goodEggs || 0), 0);
+  const activeBatches = batches.filter(b => (b.status || 'active').toLowerCase() === 'active').length;
+  const avgDefectRate = totalEggs > 0 ? ((totalDefects / totalEggs) * 100).toFixed(2) : '0.00';
+
+  // --- COVER PAGE ---
+  let y = 20;
+  const logoSize = 50;
+  const startX = (pageWidth - logoSize) / 2;
+  
+  doc.addImage(meggLogo, 'PNG', startX, y, logoSize, logoSize);
+  y += logoSize + 15;
+  
+  doc.setFontSize(24);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(30, 60, 120);
+  doc.text('Inventory Batches Report', pageWidth / 2, y, { align: 'center' });
+  y += 10;
+  
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.5);
+  doc.line(30, y, pageWidth - 30, y);
+  y += 12;
+  
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  if (farmInfo.farmName) {
+    doc.text(farmInfo.farmName, pageWidth / 2, y, { align: 'center' });
+    y += 7;
+  }
+  if (farmInfo.farmAddress) {
+    doc.text(farmInfo.farmAddress, pageWidth / 2, y, { align: 'center' });
+    y += 7;
+  }
+  y += 8;
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Generated on: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`, pageWidth / 2, y, { align: 'center' });
+  y += 20;
+
+  // Summary Box
+  doc.setFillColor(240, 248, 255);
+  doc.roundedRect(25, y, pageWidth - 50, 50, 5, 5, 'F');
+  doc.setDrawColor(200, 220, 240);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(25, y, pageWidth - 50, 50, 5, 5);
+  
+  doc.setFontSize(14);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(30, 60, 120);
+  doc.text('Summary', pageWidth / 2, y + 10, { align: 'center' });
+  
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  const summaryY = y + 20;
+  const summaryLeft = 35;
+  const summaryRight = pageWidth / 2 + 20;
+  
+  doc.text(`Total Batches: ${totalBatches}`, summaryLeft, summaryY);
+  doc.text(`Active Batches: ${activeBatches}`, summaryRight, summaryY);
+  doc.text(`Total Eggs: ${totalEggs.toLocaleString()}`, summaryLeft, summaryY + 8);
+  doc.text(`Total Good Eggs: ${totalGood.toLocaleString()}`, summaryRight, summaryY + 8);
+  doc.text(`Total Defects: ${totalDefects.toLocaleString()}`, summaryLeft, summaryY + 16);
+  doc.text(`Average Defect Rate: ${avgDefectRate}%`, summaryRight, summaryY + 16);
+  
+  addFooter(doc, pageWidth, pageHeight);
+  doc.addPage();
+
+  // --- TABLE PAGE ---
+  function addTableHeader(doc, pageWidth) {
+    const logoSize = 15;
+    const startX = (pageWidth - logoSize) / 2;
+    let y = 8;
+    
+    doc.addImage(meggLogo, 'PNG', startX, y, logoSize, logoSize);
+    y += logoSize + 3;
+    
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(30, 60, 120);
+    doc.text('Inventory Batches Report', pageWidth / 2, y, { align: 'center' });
+    y += 3;
+    
+    doc.setDrawColor(180, 180, 180);
+    doc.setLineWidth(0.3);
+    doc.line(15, y, pageWidth - 15, y);
+    return y + 5;
+  }
+
+  // Table columns with widths optimized for landscape
+  const columns = [
+    { key: 'batchNumber', header: 'Batch Number', width: 35, align: 'left' },
+    { key: 'totalEggs', header: 'Total Eggs', width: 25, align: 'right' },
+    { key: 'totalSort', header: 'Good Eggs', width: 25, align: 'right' },
+    { key: 'defectEggs', header: 'Defect Eggs', width: 25, align: 'right' },
+    { key: 'defectRate', header: 'Defect %', width: 20, align: 'right' },
+    { key: 'smallEggs', header: 'Small', width: 20, align: 'right' },
+    { key: 'mediumEggs', header: 'Medium', width: 20, align: 'right' },
+    { key: 'largeEggs', header: 'Large', width: 20, align: 'right' },
+    { key: 'status', header: 'Status', width: 25, align: 'center' },
+    { key: 'fromDate', header: 'From Date', width: 40, align: 'left' },
+    { key: 'toDate', header: 'To Date', width: 40, align: 'left' },
+  ];
+
+  const tableStartX = 10;
+  const rowHeight = 8;
+  const fontSize = 8;
+  let yPosition = addTableHeader(doc, pageWidth) + 5;
+
+  // Table header
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(fontSize);
+  doc.setTextColor(255, 255, 255);
+  doc.setFillColor(30, 60, 120);
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  
+  let x = tableStartX;
+  columns.forEach((col) => {
+    doc.rect(x, yPosition, col.width, rowHeight, 'F');
+    doc.rect(x, yPosition, col.width, rowHeight);
+    doc.text(col.header, x + (col.align === 'right' ? col.width - 3 : col.align === 'center' ? col.width / 2 : 3), 
+             yPosition + rowHeight / 2 + 1, { 
+               align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+               baseline: 'middle' 
+             });
+    x += col.width;
+  });
+  yPosition += rowHeight;
+
+  // Table rows
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  
+  batches.forEach((batch, rowIdx) => {
+    if (yPosition > pageHeight - 25) {
+      addFooter(doc, pageWidth, pageHeight);
+      doc.addPage();
+      yPosition = addTableHeader(doc, pageWidth) + 5;
+      
+      // Redraw header
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(255, 255, 255);
+      doc.setFillColor(30, 60, 120);
+      x = tableStartX;
+      columns.forEach((col) => {
+        doc.rect(x, yPosition, col.width, rowHeight, 'F');
+        doc.rect(x, yPosition, col.width, rowHeight);
+        doc.text(col.header, x + (col.align === 'right' ? col.width - 3 : col.align === 'center' ? col.width / 2 : 3), 
+                 yPosition + rowHeight / 2 + 1, { 
+                   align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+                   baseline: 'middle' 
+                 });
+        x += col.width;
+      });
+      yPosition += rowHeight;
+      doc.setFont(undefined, 'normal');
+      doc.setTextColor(0, 0, 0);
+    }
+
+    // Alternating row background
+    if (rowIdx % 2 === 1) {
+      x = tableStartX;
+      doc.setFillColor(245, 250, 255);
+      columns.forEach((col) => {
+        doc.rect(x, yPosition, col.width, rowHeight, 'F');
+        x += col.width;
+      });
+    }
+
+    // Cell content
+    x = tableStartX;
+    columns.forEach((col) => {
+      let value = '';
+      if (col.key === 'batchNumber') value = batch.batchNumber || 'Unknown';
+      else if (col.key === 'totalEggs') value = (batch.totalEggs || 0).toLocaleString();
+      else if (col.key === 'totalSort') value = ((batch.totalSort || batch.goodEggs || 0)).toLocaleString();
+      else if (col.key === 'defectEggs') value = (batch.eggSizes?.Defect || 0).toLocaleString();
+      else if (col.key === 'defectRate') {
+        const rate = calculateDefectRate(batch);
+        value = `${rate.toFixed(2)}%`;
+      }
+      else if (col.key === 'smallEggs') value = (batch.eggSizes?.Small || 0).toLocaleString();
+      else if (col.key === 'mediumEggs') value = (batch.eggSizes?.Medium || 0).toLocaleString();
+      else if (col.key === 'largeEggs') value = (batch.eggSizes?.Large || 0).toLocaleString();
+      else if (col.key === 'status') value = (batch.status || 'active').toLowerCase() === 'active' ? 'Active' : 'Not Active';
+      else if (col.key === 'fromDate') value = batch.fromDate || 'N/A';
+      else if (col.key === 'toDate') value = batch.toDate || 'N/A';
+
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.2);
+      doc.rect(x, yPosition, col.width, rowHeight);
+      
+      const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+      doc.text(value, textX, yPosition + rowHeight / 2 + 1, { 
+        align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+        baseline: 'middle',
+        maxWidth: col.width - 6
+      });
+      x += col.width;
+    });
+    yPosition += rowHeight;
+  });
+
+  // Summary row
+  yPosition += 2;
+  x = tableStartX;
+  doc.setFont(undefined, 'bold');
+  doc.setFillColor(230, 240, 255);
+  columns.forEach((col, colIdx) => {
+    doc.rect(x, yPosition, col.width, rowHeight, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(x, yPosition, col.width, rowHeight);
+    
+    let summaryValue = '';
+    if (colIdx === 0) summaryValue = 'TOTALS';
+    else if (col.key === 'totalEggs') summaryValue = totalEggs.toLocaleString();
+    else if (col.key === 'totalSort') summaryValue = totalGood.toLocaleString();
+    else if (col.key === 'defectEggs') summaryValue = totalDefects.toLocaleString();
+    else if (col.key === 'defectRate') summaryValue = `${avgDefectRate}%`;
+    else if (col.key === 'smallEggs') {
+      summaryValue = batches.reduce((sum, b) => sum + (b.eggSizes?.Small || 0), 0).toLocaleString();
+    }
+    else if (col.key === 'mediumEggs') {
+      summaryValue = batches.reduce((sum, b) => sum + (b.eggSizes?.Medium || 0), 0).toLocaleString();
+    }
+    else if (col.key === 'largeEggs') {
+      summaryValue = batches.reduce((sum, b) => sum + (b.eggSizes?.Large || 0), 0).toLocaleString();
+    }
+    else if (col.key === 'status') summaryValue = `${activeBatches} Active`;
+    
+    if (summaryValue) {
+      const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+      doc.text(summaryValue, textX, yPosition + rowHeight / 2 + 1, { 
+        align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+        baseline: 'middle' 
+      });
+    }
+    x += col.width;
+  });
+
+  addFooter(doc, pageWidth, pageHeight);
+  doc.save(`${filename}.pdf`);
+}
+
+// Individual Batch Details Export (PDF)
+export const exportBatchDetailsPDF = async (batchNumber, overviewData) => {
+  if (!overviewData) {
+    console.warn('No batch details to export')
+    return
+  }
+
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Get user farm info and load MEGG logo
+  const [farmInfo, meggLogo] = await Promise.all([
+    getUserFarmInfo(),
+    getImageBase64('/logo.png'),
+  ]);
+
+  // Calculate values
+  const totalEggs = overviewData.totalEggs || 0;
+  const goodEggs = overviewData.goodEggs || overviewData.totalSort || 0;
+  const defectEggs = overviewData.defectEggs || 0;
+  const defectRate = totalEggs > 0 ? ((defectEggs / totalEggs) * 100).toFixed(2) : '0.00';
+  const status = (overviewData.status || 'active').toLowerCase() === 'active' ? 'Active' : 'Not Active';
+
+  // --- COVER PAGE ---
+  let y = 20;
+  const logoSize = 50;
+  const startX = (pageWidth - logoSize) / 2;
+  
+  doc.addImage(meggLogo, 'PNG', startX, y, logoSize, logoSize);
+  y += logoSize + 18;
+  
+  doc.setFontSize(22);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(30, 60, 120);
+  doc.text('Batch Details Report', pageWidth / 2, y, { align: 'center' });
+  y += 12;
+  
+  doc.setDrawColor(180, 180, 180);
+  doc.setLineWidth(0.5);
+  doc.line(30, y, pageWidth - 30, y);
+  y += 12;
+  
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  if (farmInfo.farmName) {
+    doc.text(farmInfo.farmName, pageWidth / 2, y, { align: 'center' });
+    y += 7;
+  }
+  if (farmInfo.farmAddress) {
+    doc.text(farmInfo.farmAddress, pageWidth / 2, y, { align: 'center' });
+    y += 7;
+  }
+  y += 11;
+  
+  doc.setFontSize(10);
+  doc.setTextColor(100, 100, 100);
+  doc.text(`Generated on: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`, pageWidth / 2, y, { align: 'center' });
+  y += 20;
+
+  // Batch Number Highlight Box
+  doc.setFillColor(30, 60, 120);
+  doc.roundedRect(40, y, pageWidth - 80, 20, 5, 5, 'F');
+  doc.setFontSize(16);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Batch: ${batchNumber || 'Unknown'}`, pageWidth / 2, y + 12, { align: 'center' });
+  y += 30;
+
+  // Main Metrics Box
+  doc.setFillColor(245, 250, 255);
+  doc.roundedRect(25, y, pageWidth - 50, 80, 5, 5, 'F');
+  doc.setDrawColor(200, 220, 240);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(25, y, pageWidth - 50, 80, 5, 5);
+  
+  const metricsY = y + 15;
+  const leftCol = 35;
+  const rightCol = pageWidth / 2 + 10;
+  
+  // Left column
+  doc.setFontSize(11);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(30, 60, 120);
+  doc.text('Total Eggs:', leftCol, metricsY);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text(totalEggs.toLocaleString(), leftCol + 50, metricsY);
+  
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(30, 60, 120);
+  doc.text('Good Eggs:', leftCol, metricsY + 12);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text(goodEggs.toLocaleString(), leftCol + 50, metricsY + 12);
+  
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(30, 60, 120);
+  doc.text('Defect Eggs:', leftCol, metricsY + 24);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text(defectEggs.toLocaleString(), leftCol + 50, metricsY + 24);
+  
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(30, 60, 120);
+  doc.text('Defect Rate:', leftCol, metricsY + 36);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text(`${defectRate}%`, leftCol + 50, metricsY + 36);
+  
+  // Right column
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(30, 60, 120);
+  doc.text('Status:', rightCol, metricsY);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
+  doc.text(status, rightCol + 35, metricsY);
+  
+  if (overviewData.timeRange) {
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(30, 60, 120);
+    doc.text('Time Range:', rightCol, metricsY + 12);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0);
+    const timeRange = String(overviewData.timeRange);
+    const timeRangeLines = doc.splitTextToSize(timeRange, 80);
+    doc.text(timeRangeLines, rightCol + 35, metricsY + 12);
+  }
+  
+  if (overviewData.createdAt) {
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(30, 60, 120);
+    doc.text('Created At:', rightCol, metricsY + 24);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0);
+    const createdAt = new Date(overviewData.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila' });
+    doc.text(createdAt, rightCol + 35, metricsY + 24);
+  }
+  
+  y += 95;
+
+  // Size Breakdown Section
+  if (overviewData.sizeBreakdown && Object.keys(overviewData.sizeBreakdown).length > 0) {
+    doc.setFontSize(13);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(30, 60, 120);
+    doc.text('Size Breakdown', pageWidth / 2, y, { align: 'center' });
+    y += 12;
+    
+    doc.setFillColor(250, 252, 255);
+    doc.roundedRect(30, y, pageWidth - 60, 10 + Object.keys(overviewData.sizeBreakdown).length * 12, 5, 5, 'F');
+    doc.setDrawColor(200, 220, 240);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(30, y, pageWidth - 60, 10 + Object.keys(overviewData.sizeBreakdown).length * 12, 5, 5);
+    
+    // Table header
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(30, 60, 120);
+    doc.text('Size', 40, y + 8);
+    doc.text('Count', pageWidth / 2 - 20, y + 8);
+    doc.text('Percentage', pageWidth - 50, y + 8, { align: 'right' });
+    y += 12;
+    
+    // Size rows
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0);
+    Object.entries(overviewData.sizeBreakdown).forEach(([size, count]) => {
+      const percentage = totalEggs > 0 ? ((count || 0) / totalEggs * 100).toFixed(2) : '0.00';
+      doc.text(size, 40, y + 6);
+      doc.text((count || 0).toLocaleString(), pageWidth / 2 - 20, y + 6);
+      doc.text(`${percentage}%`, pageWidth - 50, y + 6, { align: 'right' });
+      y += 12;
+    });
+  }
+
+  addFooter(doc, pageWidth, pageHeight);
+  
+  const filename = `batch-details-${batchNumber || 'unknown'}-${new Date().toISOString().split('T')[0]}`;
+  doc.save(`${filename}.pdf`);
+}
+
+// Batch Overview Image Export
+export const exportBatchOverviewImage = async (elementId, batchNumber) => {
+  const element = document.getElementById(elementId)
+  if (!element) {
+    console.warn('Element not found for image export')
+    return
+  }
+
+  const filename = `batch-overview-${batchNumber || 'unknown'}-${new Date().toISOString().split('T')[0]}`
+  
+  // Create a ref-like object for exportToImage
+  const elementRef = { current: element }
+  await exportToImage(elementRef, filename)
 }
 
