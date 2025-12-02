@@ -7,9 +7,16 @@ import "./globals.css";
 // });
 
 export const metadata = {
-  title: "MEGG",
+  title: "MEGG TECH",
   description:
     "An AI-Enabled IoT Platform with Microcontroller Mechanisms for Smart Egg Defect Detection and Sorting",
+  applicationName: "MEGG TECH",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    title: "MEGG TECH",
+    statusBarStyle: "default",
+  },
 };
 
 export default function RootLayout({ children }) {

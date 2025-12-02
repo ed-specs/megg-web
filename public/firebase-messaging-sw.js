@@ -1,5 +1,6 @@
 // This file must be placed in the public directory
 // Service worker for Firebase Cloud Messaging push notifications
+// Version: 2.0 - Updated for MEGG TECH branding
 
 // Import Firebase scripts
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
