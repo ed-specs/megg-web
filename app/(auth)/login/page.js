@@ -13,6 +13,7 @@ import { Mail, Eye, EyeOff } from "lucide-react"
 import bcrypt from "bcryptjs"
 import { smartInitializeFCM } from "../../utils/smart-fcm"
 import AuthModal from "../components/AuthModal"
+import LoadingLogo from "../components/LoadingLogo"
 import { createNotification } from "../../lib/notifications/NotificationsService"
 
 // Enhanced encryption for credentials using a simple key-based approach
@@ -83,6 +84,7 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false)
   const [globalMessage, setGlobalMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
   const [currentTime, setCurrentTime] = useState("")
   const [loginAttempts, setLoginAttempts] = useState(0)
   const [lockoutTime, setLockoutTime] = useState(null)
@@ -688,15 +690,24 @@ export default function LoginPage() {
   }
 
   const viewRegister = () => {
-    router.push("/register");
-  };
+    setIsNavigating(true)
+    router.push("/register")
+  }
 
   const viewForgotPassword = () => {
+    setIsNavigating(true)
     router.push("/forgot-password")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-orange-50 relative overflow-hidden">
+      {/* Page Navigation Loading */}
+      {isNavigating && (
+        <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] flex items-center justify-center">
+          <LoadingLogo message="" size="lg" />
+        </div>
+      )}
+      
       {/* Background elements */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Background Image */}

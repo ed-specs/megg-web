@@ -13,6 +13,7 @@ import { generateUniqueAccountId, checkAccountIdExists } from "../../../app/util
 import { Eye, EyeOff } from "lucide-react"
 import { smartInitializeFCM } from "../../utils/smart-fcm"
 import AuthModal from "../components/AuthModal"
+import LoadingLogo from "../components/LoadingLogo"
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -34,6 +35,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [globalMessage, setGlobalMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
   const router = useRouter()
 
   // Generate account ID when component mounts
@@ -329,11 +331,19 @@ export default function RegisterPage() {
   }
 
   const viewSignIn = () => {
+    setIsNavigating(true)
     router.push("/login")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-orange-50 relative overflow-hidden">
+      {/* Page Navigation Loading */}
+      {isNavigating && (
+        <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] flex items-center justify-center">
+          <LoadingLogo message="" size="lg" />
+        </div>
+      )}
+      
       {/* Background elements */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Background Image */}
@@ -597,29 +607,6 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 {errors.confirmPassword && <span className="text-red-500 text-sm mt-1 block">{errors.confirmPassword}</span>}
-              </div>
-            </div>
-
-            {/* Role Selection */}
-            <div className="relative">
-              <div className="bg-gray-100 rounded-2xl px-4 py-4 focus-within:bg-white focus-within:ring-2 focus-within:ring-[#ff4a08] focus-within:ring-opacity-50 focus-within:shadow-lg hover:bg-gray-50 transition-all duration-200 border border-transparent focus-within:border-[#ff4a08]">
-                <label className="text-gray-400 text-xs font-medium uppercase tracking-wider block mb-1 focus-within:text-[#ff4a08] transition-colors duration-200">ACCOUNT TYPE</label>
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 text-[#ff4a08] mr-3 flex-shrink-0 transition-all duration-200" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                  </svg>
-                  <select
-                    name="role"
-                    id="role"
-                    value={form.role}
-                    className="flex-1 bg-transparent border-0 outline-none text-gray-800 text-base p-0 transition-all duration-200"
-                    onChange={handleInputChange}
-                    disabled={isLoading}
-                  >
-                    <option value="user">User - Personal Dashboard</option>
-                    <option value="admin">Admin - System Management</option>
-                  </select>
-                </div>
               </div>
             </div>
 

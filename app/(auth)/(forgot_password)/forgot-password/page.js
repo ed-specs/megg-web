@@ -8,12 +8,14 @@ import { collection, query, where, getDocs } from "firebase/firestore"
 import Image from "next/image"
 import { Mail } from "lucide-react"
 import AuthModal from "../../components/AuthModal"
+import LoadingLogo from "../../components/LoadingLogo"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [errors, setErrors] = useState({})
   const [globalMessage, setGlobalMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
   const router = useRouter()
 
   const handleInputChange = (e) => {
@@ -90,7 +92,10 @@ export default function ForgotPasswordPage() {
       }
 
       setGlobalMessage("Password reset instructions sent to your email.")
-      setTimeout(() => router.push("/login"), 4000)
+      setTimeout(() => {
+        setIsNavigating(true)
+        router.push("/login")
+      }, 4000)
     } catch (err) {
       console.error("Reset password error:", err)
       setGlobalMessage(err.message || "An error occurred. Please try again.")
@@ -100,11 +105,19 @@ export default function ForgotPasswordPage() {
   }
 
   const viewSignIn = () => {
+    setIsNavigating(true)
     router.push("/login")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-orange-50 relative overflow-hidden">
+      {/* Page Navigation Loading */}
+      {isNavigating && (
+        <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] flex items-center justify-center">
+          <LoadingLogo message="" size="lg" />
+        </div>
+      )}
+      
       {/* Background elements */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Background Image */}

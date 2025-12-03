@@ -11,6 +11,7 @@ import { verifyResetToken } from "../../../utils/token"
 import bcrypt from "bcryptjs"
 import { Mail, Eye, EyeOff, Lock } from "lucide-react"
 import AuthModal from "../../components/AuthModal"
+import LoadingLogo from "../../components/LoadingLogo"
 
 function PasswordPageContent() {
   const [form, setForm] = useState({
@@ -22,6 +23,7 @@ function PasswordPageContent() {
   const [errors, setErrors] = useState({})
   const [globalMessage, setGlobalMessage] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
   const [isValidToken, setIsValidToken] = useState(false)
   const [userEmail, setUserEmail] = useState("")
   const [userId, setUserId] = useState("")
@@ -49,7 +51,10 @@ function PasswordPageContent() {
   const verifyToken = async () => {
     if (!token || !email) {
       setGlobalMessage("Invalid reset link. Please request a new one.")
-      setTimeout(() => router.push("/forgot-password"), 3000)
+      setTimeout(() => {
+        setIsNavigating(true)
+        router.push("/forgot-password")
+      }, 3000)
       return
     }
 
@@ -61,7 +66,10 @@ function PasswordPageContent() {
 
       if (querySnapshot.empty) {
         setGlobalMessage("Invalid reset link. Please request a new one.")
-        setTimeout(() => router.push("/forgot-password"), 3000)
+        setTimeout(() => {
+          setIsNavigating(true)
+          router.push("/forgot-password")
+        }, 3000)
         return
       }
 
@@ -71,7 +79,10 @@ function PasswordPageContent() {
       // Check if token is expired
       if (new Date() > new Date(userData.resetPasswordExpiry)) {
         setGlobalMessage("Reset link has expired. Please request a new one.")
-        setTimeout(() => router.push("/forgot-password"), 3000)
+        setTimeout(() => {
+          setIsNavigating(true)
+          router.push("/forgot-password")
+        }, 3000)
         return
       }
 
@@ -79,7 +90,10 @@ function PasswordPageContent() {
       const isValid = verifyResetToken(token, userData.resetPasswordToken)
       if (!isValid) {
         setGlobalMessage("Invalid reset link. Please request a new one.")
-        setTimeout(() => router.push("/forgot-password"), 3000)
+        setTimeout(() => {
+          setIsNavigating(true)
+          router.push("/forgot-password")
+        }, 3000)
         return
       }
 
@@ -89,7 +103,10 @@ function PasswordPageContent() {
     } catch (error) {
       console.error("Error verifying token:", error)
       setGlobalMessage("An error occurred. Please try again.")
-      setTimeout(() => router.push("/forgot-password"), 3000)
+      setTimeout(() => {
+        setIsNavigating(true)
+        router.push("/forgot-password")
+      }, 3000)
     }
   }
 
@@ -248,14 +265,20 @@ function PasswordPageContent() {
         await auth.signOut()
       }
 
-      setTimeout(() => router.push("/login"), 3000)
+      setTimeout(() => {
+        setIsNavigating(true)
+        router.push("/login")
+      }, 3000)
     } catch (error) {
       console.error("Reset password error:", error)
       let errorMessage = "An error occurred while resetting your password."
 
       if (error.message === "Invalid reset token") {
         errorMessage = "Invalid reset link. Please request a new one."
-        setTimeout(() => router.push("/forgot-password"), 3000)
+        setTimeout(() => {
+          setIsNavigating(true)
+          router.push("/forgot-password")
+        }, 3000)
       } else if (error.code === "permission-denied") {
         errorMessage = "Access denied. Please try again or contact support."
       }
@@ -267,11 +290,19 @@ function PasswordPageContent() {
   }
 
   const viewSignIn = () => {
+    setIsNavigating(true)
     router.push("/login")
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-orange-50 relative overflow-hidden">
+      {/* Page Navigation Loading */}
+      {isNavigating && (
+        <div className="fixed inset-0 bg-white/90 backdrop-blur-sm z-[100] flex items-center justify-center">
+          <LoadingLogo message="" size="lg" />
+        </div>
+      )}
+      
       {/* Background elements */}
       <div className="absolute inset-0 overflow-hidden">
         {/* Background Image */}
@@ -499,7 +530,11 @@ function PasswordPageContent() {
 
 export default function PasswordPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50 to-orange-50">
+        <LoadingLogo message="" size="lg" />
+      </div>
+    }>
       <PasswordPageContent />
     </Suspense>
   )
