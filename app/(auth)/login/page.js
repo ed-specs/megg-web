@@ -7,8 +7,9 @@ import { db, auth } from "../../config/firebaseConfig"
 import { collection, query, where, getDocs, setDoc, doc, updateDoc } from "firebase/firestore"
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, sendPasswordResetEmail } from "firebase/auth"
 import Image from "next/image"
-import { generateOTP, calculateOTPExpiry } from "../../../app/utils/otp"
-import { generateUniqueAccountId, checkAccountIdExists } from "../../../app/utils/accountId"
+import { generateOTP, calculateOTPExpiry } from "../../utils/otp"
+import { generateUniqueAccountId, checkAccountIdExists } from "../../utils/accountId"
+import { sendVerificationEmail, devLog, devError } from "../../utils/auth-helpers"
 import { Mail, Eye, EyeOff } from "lucide-react"
 import bcrypt from "bcryptjs"
 import { smartInitializeFCM } from "../../utils/smart-fcm"
@@ -51,25 +52,6 @@ const decryptCredentials = (encrypted) => {
     return JSON.parse(decrypted)
   } catch {
     return null
-  }
-}
-
-const sendVerificationEmail = async (email, otp) => {
-  try {
-    const response = await fetch("/api/send-verification", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, otp }),
-    })
-
-    if (!response.ok) {
-      throw new Error("Failed to send verification email")
-    }
-  } catch (error) {
-    console.error("Error sending verification email:", error)
-    throw error
   }
 }
 
@@ -229,11 +211,11 @@ export default function LoginPage() {
           
           // Initialize FCM for push notifications
           try {
-            console.log(`🚀 GOOGLE LOGIN: About to initialize FCM for ${user.displayName} (${accountId})`)
+            devLog(`🚀 GOOGLE LOGIN: About to initialize FCM for ${user.displayName} (${accountId})`)
             await smartInitializeFCM(accountId, user.displayName)
-            console.log(`✅ GOOGLE LOGIN: FCM initialized successfully for ${user.displayName}`)
+            devLog(`✅ GOOGLE LOGIN: FCM initialized successfully for ${user.displayName}`)
           } catch (error) {
-            console.error(`❌ GOOGLE LOGIN: FCM initialization failed for ${user.displayName}:`, error)
+            devError(`❌ GOOGLE LOGIN: FCM initialization failed for ${user.displayName}:`, error)
           }
           
           resetLoginAttempts() // Reset on successful login
@@ -378,7 +360,7 @@ export default function LoginPage() {
           const userCredential = await signInWithEmailAndPassword(auth, userEmail, form.password)
           firebaseUser = userCredential.user
         } catch (firebaseError) {
-          console.log("Firebase Auth failed, but Firestore password is correct:", firebaseError)
+          devLog("Firebase Auth failed, but Firestore password is correct:", firebaseError)
           
           // Create a custom authentication session since Firebase Auth failed
           // This will allow the user to access the application
@@ -452,16 +434,16 @@ export default function LoginPage() {
 
         // Initialize FCM for push notifications
         try {
-          console.log(`🚀 LOGIN: About to initialize FCM for ${userData.username} (${ensuredAccountId})`)
+          devLog(`🚀 LOGIN: About to initialize FCM for ${userData.username} (${ensuredAccountId})`)
           await smartInitializeFCM(ensuredAccountId, userData.username)
-          console.log(`✅ LOGIN: FCM initialized successfully for ${userData.username}`)
+          devLog(`✅ LOGIN: FCM initialized successfully for ${userData.username}`)
         } catch (error) {
-          console.error(`❌ LOGIN: FCM initialization failed for ${userData.username}:`, error)
+          devError(`❌ LOGIN: FCM initialization failed for ${userData.username}:`, error)
         }
 
         // Create login notification
         try {
-          console.log(`🔔 LOGIN: Attempting to create notification for account ${ensuredAccountId}`)
+          devLog(`🔔 LOGIN: Attempting to create notification for account ${ensuredAccountId}`)
           const notificationId = await createNotification(
             ensuredAccountId,
             "You've successfully logged in",
@@ -469,17 +451,17 @@ export default function LoginPage() {
             false
           )
           if (notificationId) {
-            console.log(`✅ LOGIN: Notification created successfully with ID: ${notificationId}`)
+            devLog(`✅ LOGIN: Notification created successfully with ID: ${notificationId}`)
           } else {
             console.warn(`⚠️ LOGIN: Notification creation returned null for ${userData.username}`)
           }
         } catch (error) {
-          console.error(`❌ LOGIN: Failed to create notification:`, error)
-          console.error(`   Error details:`, error.message, error.code)
+          devError(`❌ LOGIN: Failed to create notification:`, error)
+          devError(`   Error details:`, error.message, error.code)
         }
 
       resetLoginAttempts() // Reset on successful login
-      console.log("🕐 LOGIN: Waiting 6 seconds before redirect to allow notification to be sent...")
+      devLog("🕐 LOGIN: Waiting 6 seconds before redirect to allow notification to be sent...")
       redirectBasedOnRole(userData.role, 6000) // Wait 6 seconds for notification
       } else {
         // Fallback to Firebase Auth if no hashed password exists
@@ -549,16 +531,16 @@ export default function LoginPage() {
 
         // Initialize FCM for push notifications
         try {
-          console.log(`🚀 FALLBACK LOGIN: About to initialize FCM for ${userData.username} (${ensuredAccountId2})`)
+          devLog(`🚀 FALLBACK LOGIN: About to initialize FCM for ${userData.username} (${ensuredAccountId2})`)
           await smartInitializeFCM(ensuredAccountId2, userData.username)
-          console.log(`✅ FALLBACK LOGIN: FCM initialized successfully for ${userData.username}`)
+          devLog(`✅ FALLBACK LOGIN: FCM initialized successfully for ${userData.username}`)
         } catch (error) {
-          console.error(`❌ FALLBACK LOGIN: FCM initialization failed for ${userData.username}:`, error)
+          devError(`❌ FALLBACK LOGIN: FCM initialization failed for ${userData.username}:`, error)
         }
 
         // Create login notification
         try {
-          console.log(`🔔 FALLBACK LOGIN: Attempting to create notification for account ${ensuredAccountId2}`)
+          devLog(`🔔 FALLBACK LOGIN: Attempting to create notification for account ${ensuredAccountId2}`)
           const notificationId = await createNotification(
             ensuredAccountId2,
             "You've successfully logged in",
@@ -566,20 +548,20 @@ export default function LoginPage() {
             false
           )
           if (notificationId) {
-            console.log(`✅ FALLBACK LOGIN: Notification created successfully with ID: ${notificationId}`)
+            devLog(`✅ FALLBACK LOGIN: Notification created successfully with ID: ${notificationId}`)
           } else {
             console.warn(`⚠️ FALLBACK LOGIN: Notification creation returned null for ${userData.username}`)
           }
         } catch (error) {
-          console.error(`❌ FALLBACK LOGIN: Failed to create notification:`, error)
-          console.error(`   Error details:`, error.message, error.code)
+          devError(`❌ FALLBACK LOGIN: Failed to create notification:`, error)
+          devError(`   Error details:`, error.message, error.code)
         }
 
-        console.log("🕐 FALLBACK LOGIN: Waiting 3 seconds before redirect to allow notification to be sent...")
+        devLog("🕐 FALLBACK LOGIN: Waiting 3 seconds before redirect to allow notification to be sent...")
         redirectBasedOnRole(userData.role, 3000) // Wait 3 seconds for notification
       }
     } catch (error) {
-      console.error("Login error:", error)
+      devError("Login error:", error)
       let errorMessage = "Login failed. Please check your credentials."
 
       if (error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
@@ -637,7 +619,7 @@ export default function LoginPage() {
       } else {
         // New Google user, generate account ID and create document
         accountId = await generateUniqueAccountId(db)
-        console.log(`Generated new account ID for Google user: ${accountId}`)
+        devLog(`Generated new account ID for Google user: ${accountId}`)
         
         // Create new user document using Account ID as document ID
         await setDoc(
@@ -667,18 +649,18 @@ export default function LoginPage() {
 
       // Initialize FCM for push notifications
       try {
-        console.log(`🚀 GOOGLE SIGNIN: About to initialize FCM for ${user.displayName} (${accountId})`)
+        devLog(`🚀 GOOGLE SIGNIN: About to initialize FCM for ${user.displayName} (${accountId})`)
         await smartInitializeFCM(accountId, user.displayName)
-        console.log(`✅ GOOGLE SIGNIN: FCM initialized successfully for ${user.displayName}`)
+        devLog(`✅ GOOGLE SIGNIN: FCM initialized successfully for ${user.displayName}`)
       } catch (error) {
-        console.error(`❌ GOOGLE SIGNIN: FCM initialization failed for ${user.displayName}:`, error)
+        devError(`❌ GOOGLE SIGNIN: FCM initialization failed for ${user.displayName}:`, error)
       }
 
       setGlobalMessage("Login successful!")
       localStorage.setItem("user", JSON.stringify(userData))
       setTimeout(() => router.replace("/dashboard/overview"), 2000)
     } catch (error) {
-      console.error("Error signing in with Google:", error)
+      devError("Error signing in with Google:", error)
       if (error.code === "permission-denied") {
         setGlobalMessage("Access denied. Please check your permissions.")
       } else {

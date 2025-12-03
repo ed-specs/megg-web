@@ -7,6 +7,8 @@ import { db } from "../../../config/firebaseConfig"
 import { collection, query, where, getDocs } from "firebase/firestore"
 import Image from "next/image"
 import { Mail } from "lucide-react"
+import { getEmailError } from "../../../utils/validation"
+import { devError } from "../../../utils/auth-helpers"
 import AuthModal from "../../components/AuthModal"
 import LoadingLogo from "../../components/LoadingLogo"
 
@@ -24,13 +26,7 @@ export default function ForgotPasswordPage() {
   }
 
   const validateField = (value) => {
-    let errorMsg = ""
-
-    if (!value) {
-      errorMsg = "Email is required."
-    } else if (!/\S+@\S+\.\S+/.test(value)) {
-      errorMsg = "Invalid email address."
-    }
+    const errorMsg = getEmailError(value)
     setErrors({ email: errorMsg })
   }
 
@@ -97,7 +93,7 @@ export default function ForgotPasswordPage() {
         router.push("/login")
       }, 4000)
     } catch (err) {
-      console.error("Reset password error:", err)
+      devError("Reset password error:", err)
       setGlobalMessage(err.message || "An error occurred. Please try again.")
     } finally {
       setIsLoading(false)

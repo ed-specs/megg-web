@@ -8,6 +8,7 @@ import { TriangleAlert } from "lucide-react"
 import { auth, db } from "../../../config/firebaseConfig"
 import { collection, query, where, getDocs, updateDoc, doc } from "firebase/firestore"
 import { generateOTP, calculateOTPExpiry } from "../../../utils/otp"
+import { sendVerificationEmail, devLog, devError } from "../../../utils/auth-helpers"
 import { sendEmailVerification } from "firebase/auth"
 import AuthModal from "../../components/AuthModal"
 import LoadingLogo from "../../components/LoadingLogo"
@@ -127,7 +128,7 @@ function VerifyPageContent() {
       setTimeLeft(900) // Reset timer to 15 minutes
       setResendCooldown(60) // Set 1-minute cooldown for next resend
     } catch (error) {
-      console.error("Error resending OTP:", error)
+      devError("Error resending OTP:", error)
       setGlobalMessage("Failed to resend verification code. Please try again.")
     } finally {
       setIsLoading(false)
@@ -180,7 +181,7 @@ function VerifyPageContent() {
         router.push("/login")
       }, 2000)
     } catch (error) {
-      console.error("Verification error:", error)
+      devError("Verification error:", error)
       setGlobalMessage("An error occurred. Please try again.")
     } finally {
       setIsLoading(false)

@@ -7,13 +7,15 @@ import { auth, db } from "../../config/firebaseConfig"
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth"
 import { collection, query, where, getDocs, setDoc, doc } from "firebase/firestore"
 import Image from "next/image"
-import { generateOTP, calculateOTPExpiry } from "../../../app/utils/otp"
-import { generateUniqueAccountId, checkAccountIdExists } from "../../../app/utils/accountId"
-// Removed toast imports - reverting to modal responses
+import { generateOTP, calculateOTPExpiry } from "../../utils/otp"
+import { generateUniqueAccountId, checkAccountIdExists } from "../../utils/accountId"
+import { getPasswordStrength, getEmailError, getPhoneError, getPasswordError, getConfirmPasswordError, getUsernameError, getFullnameError } from "../../utils/validation"
+import { sendVerificationEmail, devLog, devError } from "../../utils/auth-helpers"
 import { Eye, EyeOff } from "lucide-react"
 import { smartInitializeFCM } from "../../utils/smart-fcm"
 import AuthModal from "../components/AuthModal"
 import LoadingLogo from "../components/LoadingLogo"
+import PasswordStrengthIndicator from "../components/PasswordStrengthIndicator"
 
 export default function RegisterPage() {
   const [form, setForm] = useState({
@@ -46,7 +48,7 @@ export default function RegisterPage() {
         const id = await generateUniqueAccountId(db)
         setAccountId(id)
       } catch (error) {
-        console.error("Error generating account ID:", error)
+        devError("Error generating account ID:", error)
         setGlobalMessage("Error generating account ID. Please refresh the page.")
       } finally {
         setIsGeneratingId(false)
@@ -55,41 +57,6 @@ export default function RegisterPage() {
     generateId()
   }, [])
 
-  const sendVerificationEmail = async (email, otp) => {
-    try {
-      const response = await fetch("/api/send-verification", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, otp }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.error || `HTTP ${response.status}: Failed to send verification email`
-        throw new Error(errorMessage)
-      }
-
-      const result = await response.json()
-      console.log("Verification email sent successfully:", result)
-      return result
-    } catch (error) {
-      console.error("Error sending verification email:", error)
-      
-      // Provide more specific error messages
-      if (error.message.includes('EAUTH')) {
-        throw new Error("Email authentication failed. Please check email configuration.")
-      } else if (error.message.includes('SMTP')) {
-        throw new Error("Email server connection failed. Please try again later.")
-      } else if (error.message.includes('Invalid email')) {
-        throw new Error("Invalid email address format.")
-      } else {
-        throw new Error(error.message || "Failed to send verification email")
-      }
-    }
-  }
-
   // Handle input changes and real-time validation
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -97,62 +64,29 @@ export default function RegisterPage() {
     validateField(name, value)
   }
 
-  const getPasswordStrength = (password) => {
-    let score = 0
-    const checks = {
-      length: password.length >= 8,
-      lowercase: /[a-z]/.test(password),
-      uppercase: /[A-Z]/.test(password),
-      numbers: /[0-9]/.test(password),
-      symbols: /[^A-Za-z0-9]/.test(password)
-    }
-
-    Object.values(checks).forEach(check => {
-      if (check) score++
-    })
-
-    let level = 'weak'
-    let color = 'bg-red-500'
-    let width = '20%'
-
-    if (score >= 2 && score < 4) {
-      level = 'medium'
-      color = 'bg-yellow-500'
-      width = '60%'
-    } else if (score >= 4) {
-      level = 'strong'
-      color = 'bg-green-500'
-      width = '100%'
-    }
-
-    return { score, level, color, width, checks }
-  }
-
   const validateField = (name, value) => {
     let errorMsg = ""
 
     switch (name) {
       case "fullname":
-        if (!value) errorMsg = "Full name is required."
+        errorMsg = getFullnameError(value)
         break
       case "username":
-        if (!value) errorMsg = "Username is required."
+        errorMsg = getUsernameError(value)
         break
       case "email":
-        if (!value) errorMsg = "Email is required."
-        else if (!/\S+@\S+\.\S+/.test(value)) errorMsg = "Invalid email address."
+        errorMsg = getEmailError(value)
         break
-        case "phone":
-        if (!value) errorMsg = "Phone number is required."
-        else if (!/^\+?[\d\s-]{10,}$/.test(value)) errorMsg = "Please enter a valid phone number."
+      case "phone":
+        errorMsg = getPhoneError(value)
         break
       case "password":
-        if (value.length < 8) errorMsg = "Password must be at least 8 characters."
+        errorMsg = getPasswordError(value)
         // Update password strength
         setPasswordStrength(getPasswordStrength(value))
         break
       case "confirmPassword":
-        if (value !== form.password) errorMsg = "Passwords do not match."
+        errorMsg = getConfirmPasswordError(form.password, value)
         break
       default:
         break
@@ -196,7 +130,7 @@ export default function RegisterPage() {
           return
         }
       } catch (error) {
-        console.error("Error checking username:", error)
+        devError("Error checking username:", error)
         setGlobalMessage("Error checking username availability. Please try again.")
         setIsLoading(false)
         return
@@ -212,7 +146,7 @@ export default function RegisterPage() {
           return
         }
       } catch (error) {
-        console.error("Error checking email:", error)
+        devError("Error checking email:", error)
         setGlobalMessage("Error checking email availability. Please try again.")
         setIsLoading(false)
         return
@@ -235,7 +169,7 @@ export default function RegisterPage() {
         await sendVerificationEmail(form.email, otp)
         setGlobalMessage("Email verification sent successfully. Creating your account...")
       } catch (emailError) {
-        console.error("Email sending failed:", emailError)
+        devError("Email sending failed:", emailError)
         setGlobalMessage("Failed to send verification email. Please check your email address and try again.")
         setIsLoading(false)
         return
@@ -279,17 +213,17 @@ export default function RegisterPage() {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           })
-          console.log("Default notification settings created for new user")
+          devLog("Default notification settings created for new user")
         } catch (error) {
-          console.error("Error creating notification settings:", error)
+          devError("Error creating notification settings:", error)
         }
 
         // Initialize FCM for push notifications (no login notification for new users)
         try {
           await smartInitializeFCM(accountId) // No username = no login notification
-          console.log("FCM initialized successfully for new user")
+          devLog("FCM initialized successfully for new user")
         } catch (error) {
-          console.error("FCM initialization failed:", error)
+          devError("FCM initialization failed:", error)
         }
 
         // Success! Everything worked
@@ -297,14 +231,14 @@ export default function RegisterPage() {
         setTimeout(() => router.push(`/verify?email=${form.email}`), 3000)
         
       } catch (firestoreError) {
-        console.error("Error saving user data to Firestore:", firestoreError)
+        devError("Error saving user data to Firestore:", firestoreError)
         
         // Rollback: Delete the Firebase Auth user since Firestore save failed
         try {
           await userCredential.user.delete()
           setGlobalMessage("Failed to save user data. Your account was not created. Please try again.")
         } catch (deleteError) {
-          console.error("Error deleting auth user during rollback:", deleteError)
+          devError("Error deleting auth user during rollback:", deleteError)
           setGlobalMessage("Registration failed and cleanup failed. Please contact support.")
         }
         setIsLoading(false)
@@ -324,7 +258,7 @@ export default function RegisterPage() {
       }
 
       setGlobalMessage(errorMessage)
-      console.error("Registration error:", error)
+      devError("Registration error:", error)
     } finally {
       setIsLoading(false)
     }
@@ -492,37 +426,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
                 {/* Password Strength Indicator */}
-                {form.password && (
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-500">Password strength</span>
-                      <span className={`text-xs font-medium ${
-                        passwordStrength.level === 'weak' ? 'text-red-500' :
-                        passwordStrength.level === 'medium' ? 'text-yellow-500' : 'text-green-500'
-                      }`}>
-                        {passwordStrength.level.charAt(0).toUpperCase() + passwordStrength.level.slice(1)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div 
-                        className={`h-1.5 rounded-full transition-all duration-300 ${passwordStrength.color}`}
-                        style={{ width: passwordStrength.width }}
-                      ></div>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {Object.entries(passwordStrength.checks || {}).map(([key, passed]) => (
-                        <span key={key} className={`text-xs px-2 py-1 rounded ${
-                          passed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {key === 'length' ? '8+ chars' :
-                           key === 'lowercase' ? 'a-z' :
-                           key === 'uppercase' ? 'A-Z' :
-                           key === 'numbers' ? '0-9' : 'symbols'}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <PasswordStrengthIndicator strength={passwordStrength} password={form.password} />
                 {errors.password && <span className="text-red-500 text-sm mt-1 block">{errors.password}</span>}
               </div>
             </div>

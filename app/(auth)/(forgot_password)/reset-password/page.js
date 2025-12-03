@@ -8,10 +8,13 @@ import { collection, query, where, getDocs, updateDoc, doc } from "firebase/fire
 import { signInWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth"
 import Image from "next/image"
 import { verifyResetToken } from "../../../utils/token"
+import { getPasswordStrength, getEmailError, getPasswordError, getConfirmPasswordError } from "../../../utils/validation"
+import { devLog, devError } from "../../../utils/auth-helpers"
 import bcrypt from "bcryptjs"
 import { Mail, Eye, EyeOff, Lock } from "lucide-react"
 import AuthModal from "../../components/AuthModal"
 import LoadingLogo from "../../components/LoadingLogo"
+import PasswordStrengthIndicator from "../../components/PasswordStrengthIndicator"
 
 function PasswordPageContent() {
   const [form, setForm] = useState({
@@ -101,44 +104,13 @@ function PasswordPageContent() {
       setUserEmail(email)
       setUserId(userDoc.id)
     } catch (error) {
-      console.error("Error verifying token:", error)
+      devError("Error verifying token:", error)
       setGlobalMessage("An error occurred. Please try again.")
       setTimeout(() => {
         setIsNavigating(true)
         router.push("/forgot-password")
       }, 3000)
     }
-  }
-
-  const getPasswordStrength = (password) => {
-    let score = 0
-    const checks = {
-      length: password.length >= 8,
-      lowercase: /[a-z]/.test(password),
-      uppercase: /[A-Z]/.test(password),
-      numbers: /[0-9]/.test(password),
-      symbols: /[^A-Za-z0-9]/.test(password)
-    }
-
-    Object.values(checks).forEach(check => {
-      if (check) score++
-    })
-
-    let level = 'weak'
-    let color = 'bg-red-500'
-    let width = '20%'
-
-    if (score >= 2 && score < 4) {
-      level = 'medium'
-      color = 'bg-yellow-500'
-      width = '60%'
-    } else if (score >= 4) {
-      level = 'strong'
-      color = 'bg-green-500'
-      width = '100%'
-    }
-
-    return { score, level, color, width, checks }
   }
 
   const handleInputChange = (e) => {
@@ -152,21 +124,15 @@ function PasswordPageContent() {
 
     switch (name) {
       case "email":
-        if (!value) {
-          errorMsg = "Email is required."
-        } else if (!/\S+@\S+\.\S+/.test(value)) {
-          errorMsg = "Please enter a valid email address."
-        }
+        errorMsg = getEmailError(value)
         break
       case "password":
-        if (value.length < 8) {
-          errorMsg = "Password must be at least 8 characters."
-        }
+        errorMsg = getPasswordError(value)
         // Update password strength
         setPasswordStrength(getPasswordStrength(value))
         break
       case "confirmPassword":
-        if (value !== form.password) errorMsg = "Passwords do not match."
+        errorMsg = getConfirmPasswordError(form.password, value)
         break
       default:
         break
@@ -197,7 +163,7 @@ function PasswordPageContent() {
       await sendPasswordResetEmail(auth, form.email)
       setGlobalMessage("Password reset link sent to your email! Please check your inbox.")
     } catch (error) {
-      console.error("Forgot password error:", error)
+      devError("Forgot password error:", error)
       let errorMessage = "An error occurred while sending the reset link."
 
       if (error.code === "auth/user-not-found") {
@@ -254,7 +220,7 @@ function PasswordPageContent() {
           await updatePassword(auth.currentUser, form.password)
         }
       } catch (firebaseError) {
-        console.log("Could not update Firebase Auth password:", firebaseError)
+        devLog("Could not update Firebase Auth password:", firebaseError)
         // This is expected if user is not authenticated
       }
 
@@ -270,7 +236,7 @@ function PasswordPageContent() {
         router.push("/login")
       }, 3000)
     } catch (error) {
-      console.error("Reset password error:", error)
+      devError("Reset password error:", error)
       let errorMessage = "An error occurred while resetting your password."
 
       if (error.message === "Invalid reset token") {
@@ -412,37 +378,7 @@ function PasswordPageContent() {
                   </div>
                 </div>
                 {/* Password Strength Indicator */}
-                {form.password && (
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-xs text-gray-500">Password strength</span>
-                      <span className={`text-xs font-medium ${
-                        passwordStrength.level === 'weak' ? 'text-red-500' :
-                        passwordStrength.level === 'medium' ? 'text-yellow-500' : 'text-green-500'
-                      }`}>
-                        {passwordStrength.level.charAt(0).toUpperCase() + passwordStrength.level.slice(1)}
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-1.5">
-                      <div 
-                        className={`h-1.5 rounded-full transition-all duration-300 ${passwordStrength.color}`}
-                        style={{ width: passwordStrength.width }}
-                      ></div>
-                    </div>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {Object.entries(passwordStrength.checks || {}).map(([key, passed]) => (
-                        <span key={key} className={`text-xs px-2 py-1 rounded ${
-                          passed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {key === 'length' ? '8+ chars' :
-                           key === 'lowercase' ? 'a-z' :
-                           key === 'uppercase' ? 'A-Z' :
-                           key === 'numbers' ? '0-9' : 'symbols'}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <PasswordStrengthIndicator strength={passwordStrength} password={form.password} />
                 {errors.password && <span className="text-red-500 text-sm mt-1 block">{errors.password}</span>}
               </div>
 
