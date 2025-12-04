@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback, useMemo } from "react"
 import { Upload, Trash2, Save, SaveOff, TriangleAlert } from "lucide-react"
 import Image from "next/image"
 import { db, auth, storage } from "../../../config/firebaseConfig"
-import { doc, getDoc, updateDoc } from "firebase/firestore"
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage"
 import { onAuthStateChanged } from "firebase/auth"
 import { trackProfileChanges } from "../../../lib/notifications/ProfileChangeTracker"
@@ -13,8 +13,12 @@ import { Navbar } from "../../components/NavBar"
 import { Header } from "../../components/Header"
 import { useRouter } from "next/navigation"
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../../../utils/auth-utils"
+import { devLog, devError } from "../../../utils/auth-helpers"
+import { saveInAppNotification } from "../../../utils/notification-utils"
+import { saveAuditLog } from "../../../utils/audit-log"
 import ImageEditor from "../../../components/ImageEditor"
 import ResultModal from "../../components/ResultModal"
+import MultipleFarmManager from "../components/MultipleFarmManager"
 
 export default function EditProfile() {
   const [isSidebarOpen, setSidebarOpen] = useState(false)
@@ -23,6 +27,7 @@ export default function EditProfile() {
   const [showImageEditor, setShowImageEditor] = useState(false)
   const [editedImageFile, setEditedImageFile] = useState(null)
   const [globalMessage, setGlobalMessage] = useState("")
+  const [resultMessage, setResultMessage] = useState("")
   const [userData, setUserData] = useState({
     fullname: "",
     birthday: "",
@@ -34,6 +39,8 @@ export default function EditProfile() {
     farmName: "",
     farmAddress: "",
     profileImageUrl: "",
+    // Farm management fields
+    farms: [], // Multiple farms support
   })
   const [loading, setLoading] = useState(true)
   const [originalUserData, setOriginalUserData] = useState({})
@@ -89,6 +96,7 @@ export default function EditProfile() {
             farmName: data.farmName || "",
             farmAddress: data.farmAddress || "",
             profileImageUrl: data.profileImageUrl || "",
+            farms: data.farms || [], // Multiple farms support
             accountId: data.accountId || accountId || docId, // Store accountId for notifications
           }
           
@@ -135,16 +143,16 @@ export default function EditProfile() {
     fetchUserData()
   }, [router])
 
-  const handleInputChange = (e) => {
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target
     setUserData((prev) => ({ ...prev, [name]: value }))
-  }
+  }, [])
 
-  const handleOpenImageEditor = () => {
+  const handleOpenImageEditor = useCallback(() => {
     setShowImageEditor(true)
-  }
+  }, [])
 
-  const handleImageEditorSave = (editedFile) => {
+  const handleImageEditorSave = useCallback((editedFile) => {
     setEditedImageFile(editedFile)
     
     // Create preview from edited file
@@ -155,13 +163,13 @@ export default function EditProfile() {
       console.log("✅ Edit Profile: Image edited and preview updated")
     }
     reader.readAsDataURL(editedFile)
-  }
+  }, [])
 
-  const handleImageEditorCancel = () => {
+  const handleImageEditorCancel = useCallback(() => {
     setShowImageEditor(false)
-  }
+  }, [])
 
-  const uploadImageToStorage = async (file) => {
+  const uploadImageToStorage = useCallback(async (file) => {
     try {
       const user = getCurrentUser()
       const storedUser = getStoredUser()
@@ -213,9 +221,9 @@ export default function EditProfile() {
         throw new Error(`Upload failed: ${error.message}`)
       }
     }
-  }
+  }, [])
 
-  const handleSaveImage = async () => {
+  const handleSaveImage = useCallback(async () => {
     try {
       if (!previewImage || !editedImageFile) {
         setGlobalMessage("No image to save. Please upload and edit an image first.")
@@ -281,6 +289,14 @@ export default function EditProfile() {
         setEditedImageFile(null)
         
         console.log("✅ Edit Profile: Image upload completed successfully")
+        
+        // Save audit log
+        await saveAuditLog(
+          notificationAccountId,
+          oldProfileImageUrl ? 'profile_image_updated' : 'profile_image_added',
+          oldProfileImageUrl ? 'Profile picture was updated' : 'Profile picture was added'
+        )
+        
         setGlobalMessage("Profile image updated successfully!")
 
         // Clear message after 3 seconds
@@ -295,9 +311,9 @@ export default function EditProfile() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [previewImage, editedImageFile, userData, originalUserData, uploadImageToStorage])
 
-  const handleSaveFields = async () => {
+  const handleSaveFields = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -346,6 +362,15 @@ export default function EditProfile() {
       }
 
       setOriginalUserData(userData)
+      
+      // Save audit log
+      await saveAuditLog(
+        notificationAccountId,
+        'profile_updated',
+        'Profile information was updated',
+        { fields: Object.keys(fieldsData).join(', ') }
+      )
+      
       setGlobalMessage("Profile information updated successfully!")
 
       // Clear message after 3 seconds
@@ -356,9 +381,9 @@ export default function EditProfile() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userData, originalUserData])
 
-  const handleRemoveImage = async () => {
+  const handleRemoveImage = useCallback(async () => {
     try {
       setLoading(true)
       
@@ -398,6 +423,14 @@ export default function EditProfile() {
       setUserData((prev) => ({ ...prev, profileImageUrl: "" }))
       setProfileImage("/default.png")
       setPreviewImage(null)
+      
+      // Save audit log
+      await saveAuditLog(
+        docId,
+        'profile_image_removed',
+        'Profile picture was removed'
+      )
+      
       setGlobalMessage("Profile image removed successfully!")
 
       // Clear message after 3 seconds
@@ -408,18 +441,108 @@ export default function EditProfile() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [userData])
 
-  const hasImageChanges = () => {
+  const handlePromoteToPrimary = useCallback(async (selectedFarm, farmIndex) => {
+    try {
+      // Swap the primary farm with the selected additional farm
+      const currentPrimaryName = userData.farmName
+      const currentPrimaryAddress = userData.farmAddress
+
+      // Create a new farm entry from current primary (if it exists)
+      const updatedFarms = [...(userData.farms || [])]
+      
+      // Remove the promoted farm from the array
+      updatedFarms.splice(farmIndex, 1)
+
+      // Add current primary to additional farms (if it has a name)
+      if (currentPrimaryName && currentPrimaryName.trim()) {
+        updatedFarms.push({
+          id: Date.now().toString(),
+          name: currentPrimaryName,
+          address: currentPrimaryAddress || "",
+          isPrimary: false,
+          createdAt: new Date().toISOString()
+        })
+      }
+
+      // Update userData with the new primary and updated farms array
+      setUserData((prev) => ({
+        ...prev,
+        farmName: selectedFarm.name,
+        farmAddress: selectedFarm.address || "",
+        farms: updatedFarms
+      }))
+
+      // Get user info for notifications
+      const user = getCurrentUser()
+      const accountId = getUserAccountId()
+      const docId = accountId || user?.uid
+
+      // Send in-app notification to Firestore
+      await saveInAppNotification(
+        `Primary farm changed to "${selectedFarm.name}". Previous primary "${currentPrimaryName || 'farm'}" moved to additional farms.`,
+        "farm_primary_changed"
+      )
+
+      // Save audit log
+      await saveAuditLog(
+        docId,
+        'farm_primary_changed',
+        `Primary farm changed from "${currentPrimaryName || 'N/A'}" to "${selectedFarm.name}"`,
+        { 
+          oldPrimaryName: currentPrimaryName,
+          oldPrimaryAddress: currentPrimaryAddress,
+          newPrimaryName: selectedFarm.name,
+          newPrimaryAddress: selectedFarm.address
+        }
+      )
+
+      // Send email notification
+      try {
+        await fetch('/api/notifications/send-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            accountId: docId,
+            subject: '🏭 Primary Farm Changed - MEGG',
+            message: `
+              <h2>Primary Farm Updated</h2>
+              <p>Your primary farm has been successfully changed.</p>
+              <p><strong>Previous Primary Farm:</strong> ${currentPrimaryName || 'Not set'}</p>
+              ${currentPrimaryAddress ? `<p>${currentPrimaryAddress}</p>` : ''}
+              <p><strong>New Primary Farm:</strong> ${selectedFarm.name}</p>
+              ${selectedFarm.address ? `<p>${selectedFarm.address}</p>` : ''}
+              <p style="margin-top: 20px; color: #666;">
+                <strong>Note:</strong> Remember to click "Save Profile Information" to persist these changes.
+              </p>
+              <p style="color: #666;">This farm will now be used in all exports and reports.</p>
+            `
+          })
+        })
+      } catch (emailError) {
+        devError("Error sending farm change email:", emailError)
+      }
+
+      // Show success modal
+      setResultMessage(`Primary farm successfully changed to "${selectedFarm.name}"!\n\nThe previous primary farm "${currentPrimaryName || 'farm'}" has been moved to additional farms.\n\nDon't forget to click "Save Profile Information" to persist these changes.`)
+      
+    } catch (error) {
+      devError("Error promoting farm to primary:", error)
+      setResultMessage("Failed to promote farm. Please try again.")
+    }
+  }, [userData])
+
+  const hasImageChanges = useMemo(() => {
     return previewImage !== null && editedImageFile !== null
-  }
+  }, [previewImage, editedImageFile])
 
-  const hasFieldChanges = () => {
+  const hasFieldChanges = useMemo(() => {
     // Compare fields only (excluding profileImageUrl)
     const { profileImageUrl: currentImage, ...currentFields } = userData
     const { profileImageUrl: originalImage, ...originalFields } = originalUserData
     return JSON.stringify(currentFields) !== JSON.stringify(originalFields)
-  }
+  }, [userData, originalUserData])
 
   if (loading && !userData.fullname) {
     return (
@@ -605,7 +728,7 @@ export default function EditProfile() {
                   </div>
                   
                   {/* Save Image Button */}
-                  {hasImageChanges() && (
+                  {hasImageChanges && (
                     <button
                       onClick={handleSaveImage}
                       disabled={loading}
@@ -668,7 +791,7 @@ export default function EditProfile() {
                     placeholder="Enter your email"
                   />
                   <p className="text-xs text-gray-500 mt-2">
-                    Email address cannot be changed for security reasons
+                    Email cannot be changed. Contact support if you need to update your email address.
                   </p>
                 </div>
 
@@ -745,6 +868,16 @@ export default function EditProfile() {
                   />
                 </div>
 
+                {/* Farm Information Section */}
+                <div className="md:col-span-2">
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-4 mb-4 border border-green-200">
+                    <h3 className="text-sm font-semibold text-green-900 mb-2">🏭 Primary Farm Information</h3>
+                    <p className="text-xs text-green-700">
+                      Enter your main farm details below. You can add additional farms in the next section.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-[#1F2421] mb-3">
                     Farm Name
@@ -771,6 +904,20 @@ export default function EditProfile() {
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-[#105588] focus:border-[#105588] transition-all duration-200 text-gray-800 resize-none"
                     placeholder="Enter your farm address"
                   />
+                  <p className="text-xs text-gray-500 mt-2">
+                    💡 Tip: Include city, province for better location tracking
+                  </p>
+                </div>
+
+                {/* Multiple Farm Manager */}
+                <div className="md:col-span-2">
+                  <MultipleFarmManager
+                    farms={userData.farms || []}
+                    setFarms={(newFarms) => setUserData((prev) => ({ ...prev, farms: newFarms }))}
+                    primaryFarmName={userData.farmName}
+                    primaryFarmAddress={userData.farmAddress}
+                    onPromoteToPrimary={handlePromoteToPrimary}
+                  />
                 </div>
               </div>
 
@@ -788,9 +935,9 @@ export default function EditProfile() {
                 
                 <button
                   onClick={handleSaveFields}
-                  disabled={loading || !hasFieldChanges()}
+                  disabled={loading || !hasFieldChanges}
                   className={`flex items-center gap-3 px-6 py-3 rounded-2xl font-semibold transition-colors duration-200 ${
-                    hasFieldChanges() && !loading
+                    hasFieldChanges && !loading
                       ? "bg-[#105588] text-white hover:bg-[#0d4470] focus:outline-none focus:ring-4 focus:ring-[#105588]/30"
                       : "bg-gray-300 text-gray-500 cursor-not-allowed"
                   }`}
@@ -800,7 +947,7 @@ export default function EditProfile() {
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
                       Saving Changes...
                     </>
-                  ) : hasFieldChanges() ? (
+                  ) : hasFieldChanges ? (
                     <>
                       <Save className="w-5 h-5" />
                       Save Profile Information
@@ -831,6 +978,14 @@ export default function EditProfile() {
         onSave={handleImageEditorSave}
         onCancel={handleImageEditorCancel}
       />
+
+      {/* Result Modal */}
+      {resultMessage && (
+        <ResultModal
+          message={resultMessage}
+          onClose={() => setResultMessage("")}
+        />
+      )}
     </div>
   )
 }

@@ -1,6 +1,6 @@
 "use client";
-import { Bell, Menu, Trash2, X, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, Check, AlertTriangle, RefreshCw, Filter } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Bell, Menu, Trash2, X, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, Check, AlertTriangle, RefreshCw, Filter, Shield } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { auth, db } from "../../config/firebaseConfig.js";
@@ -27,6 +27,28 @@ export  function Header({ setSidebarOpen }) {
   );
   const [notifications, setNotifications] = useState([]);
   const [userId, setUserId] = useState(null);
+  const notificationDropdownRef = useRef(null);
+
+  // Close notification dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (
+        notificationDropdownRef.current &&
+        !notificationDropdownRef.current.contains(event.target) &&
+        showNotificationDropdown
+      ) {
+        setShowNotificationDropdown(false);
+      }
+    };
+
+    if (showNotificationDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showNotificationDropdown]);
 
   useEffect(() => {
     // Function to fetch user data
@@ -201,6 +223,7 @@ export  function Header({ setSidebarOpen }) {
       "/dashboard/profile": "Profile",
       "/dashboard/settings/edit-profile": "Edit Profile",
       "/dashboard/settings/change-password": "Change Password",
+      "/dashboard/settings/security": "Security",
       "/dashboard/settings/preferences": "Preferences",
     }[pathname] || "Page";
   return (
@@ -257,10 +280,10 @@ export  function Header({ setSidebarOpen }) {
           </button>
 
                     {/* notification */}
-                    <div className="relative">
+                    <div className="relative" ref={notificationDropdownRef}>
             <button
               onClick={() => setShowNotificationDropdown((prev) => !prev)}
-              className={`p-2 rounded-full transition-colors duration-150 cursor-pointer ${
+              className={`p-2 rounded-full transition-all duration-200 cursor-pointer ${
                 showNotificationDropdown
                   ? "bg-[#105588] text-white hover:bg-[#0d4470]"
                   : "hover:bg-gray-100"
@@ -277,15 +300,19 @@ export  function Header({ setSidebarOpen }) {
             {/* notification */}
             {showNotificationDropdown && (
               <>
-                {/* Backdrop for mobile modal effect */}
-                <div className="fixed inset-0 bg-black bg-opacity-20 z-30 sm:hidden"></div>
+                {/* Backdrop for mobile modal effect with fade-in animation */}
+                <div 
+                  className="fixed inset-0 bg-black bg-opacity-20 z-30 sm:hidden animate-fadeIn"
+                  onClick={() => setShowNotificationDropdown(false)}
+                ></div>
                 <div
                   className="
                     fixed top-0 left-0 w-screen h-screen z-40 flex items-start justify-center pt-6
                     sm:absolute sm:top-auto sm:left-auto sm:w-96 sm:h-auto sm:pt-0 sm:right-0 sm:translate-x-0
+                    animate-slideDown sm:animate-scaleIn
                   "
                 >
-                  <div className="rounded-2xl bg-white border border-gray-300 flex flex-col overflow-hidden shadow-lg w-[95vw] max-w-md sm:w-96">
+                  <div className="rounded-2xl bg-white border border-gray-300 flex flex-col overflow-hidden shadow-2xl w-[95vw] max-w-md sm:w-96">
                     {/* header */}
                     <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-300">
                       <div className="flex items-center gap-2">
@@ -394,6 +421,14 @@ export  function Header({ setSidebarOpen }) {
                               ) : notif.icon === "filter" ? (
                                 <div className="w-12 h-12 bg-yellow-500 flex items-center justify-center rounded-full">
                                   <Filter className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : (notif.icon === "building" || notif.type === "farm_primary_changed") ? (
+                                <div className="w-12 h-12 bg-green-600 flex items-center justify-center rounded-full">
+                                  <Building2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : (notif.icon === "shield" || notif.type === "security_session_revoked") ? (
+                                <div className="w-12 h-12 bg-red-600 flex items-center justify-center rounded-full">
+                                  <Shield className="w-5 h-5 text-white" strokeWidth={2.5} />
                                 </div>
                               ) : notif.profileImage ? (
                                 <Image

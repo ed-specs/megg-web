@@ -5,7 +5,7 @@ import { Navbar } from "../components/NavBar";
 import { Header } from "../components/Header";
 import { getUserNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from "../../lib/notifications/NotificationsService";
 import { getUserAccountId } from "../../utils/auth-utils";
-import { Bell, BellOff, Check, Trash, CheckCheck, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, AlertTriangle, RefreshCw, Filter } from "lucide-react";
+import { Bell, BellOff, Check, Trash, CheckCheck, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, AlertTriangle, RefreshCw, Filter, Shield } from "lucide-react";
 import Image from "next/image";
 import LoadingLogo from "../components/LoadingLogo";
 import { useLoadingDelay } from "../components/useLoadingDelay";
@@ -237,6 +237,14 @@ export default function NotificationPage() {
                         ) : notification.icon === "filter" ? (
                           <div className="w-12 h-12 bg-yellow-500 flex items-center justify-center rounded-full">
                             <Filter className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                        ) : (notification.icon === "building" || notification.type === "farm_primary_changed") ? (
+                          <div className="w-12 h-12 bg-green-600 flex items-center justify-center rounded-full">
+                            <Building2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                        ) : (notification.icon === "shield" || notification.type === "security_session_revoked") ? (
+                          <div className="w-12 h-12 bg-red-600 flex items-center justify-center rounded-full">
+                            <Shield className="w-5 h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.profileImage ? (
                           <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">

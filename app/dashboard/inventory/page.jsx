@@ -665,20 +665,20 @@ export default function InventoryPage() {
       </div>
 
       {/* MAIN */}
-      <div className="flex gap-6 p-4 md:p-6">
+      <div className="flex gap-4 sm:gap-6 p-3 sm:p-4 md:p-6">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Navbar />
         </div>
 
-        <div className="flex flex-1 flex-col gap-6 w-full">
+        <div className="flex flex-1 flex-col gap-4 sm:gap-6 w-full min-w-0">
           {/* Header */}
           <Header setSidebarOpen={setSidebarOpen} />
 
           {/* Main container */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 sm:gap-6">
             {/* batch review display */}
-            <div className="bg-white rounded-2xl border border-gray-300 p-6">
+            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-300 p-3 sm:p-4 md:p-6">
               {showLoading ? (
                 <div className="py-12">
                   <LoadingLogo message="Loading inventory data..." size="lg" />
@@ -686,14 +686,14 @@ export default function InventoryPage() {
               ) : selectedBatch ? (
                 <div className="flex flex-col gap-6">
                   {/* Header with close button */}
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 sm:gap-4">
                     {/* Batch Number, Status Badge, and Close Button Row */}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <h2 className="text-xl font-semibold truncate">{selectedBatch}</h2>
+                    <div className="flex items-center justify-between gap-2 sm:gap-3">
+                      <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                        <h2 className="text-lg sm:text-xl font-semibold truncate">{selectedBatch}</h2>
                         {/* Status Badge */}
                         <span
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium whitespace-nowrap flex-shrink-0 ${
+                          className={`inline-flex items-center px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0 ${
                             (overviewData?.status || "active").toLowerCase() === "active"
                               ? "bg-green-100 text-green-700"
                               : "bg-gray-100 text-gray-700"
@@ -710,9 +710,9 @@ export default function InventoryPage() {
                           setSelectedBatch(null)
                           setQrCodeDataUrl(null)
                         }}
-                        className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-150 text-sm font-medium flex-shrink-0"
+                        className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors duration-150 text-xs sm:text-sm font-medium flex-shrink-0"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                         <span className="hidden sm:inline">Close</span>
@@ -720,10 +720,10 @@ export default function InventoryPage() {
                     </div>
                     
                     {/* Date, Status Toggle, and Export Row */}
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="flex items-center gap-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+                      <div className="flex items-center gap-2 sm:gap-3">
                         {overviewData?.createdAt && (
-                          <p className="text-gray-500 text-sm">
+                          <p className="text-gray-500 text-xs sm:text-sm">
                             {new Date(overviewData.createdAt).toLocaleDateString('en-US', { 
                               year: 'numeric', 
                               month: 'long', 
@@ -732,26 +732,26 @@ export default function InventoryPage() {
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         {/* Export Dropdown for Batch Details */}
                         <div className="relative" ref={exportDropdownRef}>
                           <button
                             onClick={() => setShowExportDropdown(!showExportDropdown)}
                             disabled={isExporting}
-                            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 text-sm font-medium"
+                            className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 text-xs sm:text-sm font-medium"
                           >
-                            <Download className="w-4 h-4" />
-                            {isExporting ? 'Exporting...' : 'Export'}
+                            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <span className="hidden xs:inline">{isExporting ? 'Exporting...' : 'Export'}</span>
                           </button>
                           
                           {showExportDropdown && (
-                            <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                            <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
                               <button
                                 onClick={() => {
                                   handleExportBatchDetails('pdf');
                                   setShowExportDropdown(false);
                                 }}
-                                className="w-full text-left px-4 py-2 hover:bg-gray-50 first:rounded-t-lg"
+                                className="w-full text-left px-3 sm:px-4 py-2 hover:bg-gray-50 first:rounded-t-lg text-xs sm:text-sm"
                               >
                                 Export as PDF
                               </button>
@@ -760,7 +760,7 @@ export default function InventoryPage() {
                                   handleExportBatchDetails('image');
                                   setShowExportDropdown(false);
                                 }}
-                                className="w-full text-left px-4 py-2 hover:bg-gray-50 last:rounded-b-lg"
+                                className="w-full text-left px-3 sm:px-4 py-2 hover:bg-gray-50 last:rounded-b-lg text-xs sm:text-sm"
                               >
                                 Export as Image
                               </button>
@@ -771,7 +771,7 @@ export default function InventoryPage() {
                         <button
                           onClick={handleStatusToggle}
                           disabled={updatingStatus}
-                          className={`flex items-center justify-center gap-2 px-4 py-2 rounded-lg transition-colors duration-150 text-sm font-medium ${
+                          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors duration-150 text-xs sm:text-sm font-medium whitespace-nowrap ${
                             (overviewData?.status || "active").toLowerCase() === "active"
                               ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
                               : "bg-green-100 text-green-700 hover:bg-green-200"
@@ -779,14 +779,21 @@ export default function InventoryPage() {
                         >
                           {updatingStatus ? (
                             <>
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              <span>Updating...</span>
+                              <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                              <span className="hidden xs:inline">Updating...</span>
                             </>
                           ) : (
                             <>
-                              {(overviewData?.status || "active").toLowerCase() === "active"
-                                ? "Set Not Active"
-                                : "Set Active"}
+                              <span className="hidden sm:inline">
+                                {(overviewData?.status || "active").toLowerCase() === "active"
+                                  ? "Set Not Active"
+                                  : "Set Active"}
+                              </span>
+                              <span className="sm:hidden">
+                                {(overviewData?.status || "active").toLowerCase() === "active"
+                                  ? "Deactivate"
+                                  : "Activate"}
+                              </span>
                             </>
                           )}
                         </button>
@@ -814,29 +821,29 @@ export default function InventoryPage() {
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-4 sm:gap-6">
                   {/* Header with refresh and export buttons */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-semibold">Inventory Batches</h2>
-                      <p className="text-gray-500 text-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div className="min-w-0">
+                      <h2 className="text-lg sm:text-xl font-semibold truncate">Inventory Batches</h2>
+                      <p className="text-gray-500 text-xs sm:text-sm">
                         {filteredAndSortedBatches.length === batchReviews.length
                           ? `Showing ${batchReviews.length} batch${batchReviews.length !== 1 ? 'es' : ''}`
                           : `Showing ${filteredAndSortedBatches.length} of ${batchReviews.length} batches`}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
                       {/* Export Button */}
                       {filteredAndSortedBatches.length > 0 && (
                         <button
                           onClick={() => setShowBatchSelectionModal(true)}
                           disabled={isExporting}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 text-sm font-medium"
+                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 text-xs sm:text-sm font-medium"
                         >
-                          <Download className="w-4 h-4" />
-                          {isExporting ? 'Exporting...' : 'Export'}
+                          <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span className="hidden xs:inline">{isExporting ? 'Exporting...' : 'Export'}</span>
                           {selectedBatches.length > 0 && (
-                            <span className="bg-white text-blue-500 rounded-full w-5 h-5 flex items-center justify-center text-xs font-semibold">
+                            <span className="bg-white text-blue-500 rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs font-semibold">
                               {selectedBatches.length}
                             </span>
                           )}
@@ -845,10 +852,10 @@ export default function InventoryPage() {
                       <button
                         onClick={refreshData}
                         disabled={isRefreshing}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 text-sm font-medium"
+                        className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 text-xs sm:text-sm font-medium"
                       >
-                        <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                        <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        <span className="hidden xs:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
                       </button>
                     </div>
                   </div>
@@ -877,24 +884,24 @@ export default function InventoryPage() {
                   />
 
                   {/* Quick Stats Dashboard */}
-                  <div className="space-y-6">
+                  <div className="space-y-4 sm:space-y-6">
                     {/* Toggle Insights Button */}
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 sm:gap-3">
                       <button
                         onClick={() => setShowInsights(!showInsights)}
-                        className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                        className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                       >
-                        <TrendingUp className="w-4 h-4" />
+                        <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         {showInsights ? 'Hide' : 'Show'} Analytics & Insights
                       </button>
                       
                       {/* Batch Comparison Button */}
                       <button
                         onClick={() => setShowComparisonSelectionModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium"
+                        className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-xs sm:text-sm font-medium"
                       >
-                        <GitCompare className="w-4 h-4" />
-                        Compare Batches
+                        <GitCompare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>Compare Batches</span>
                       </button>
                     </div>
 

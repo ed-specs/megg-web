@@ -5,14 +5,11 @@ import { Header } from "../components/Header";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { auth, db } from "../../config/firebaseConfig";
-import { EmailAuthProvider, reauthenticateWithCredential, deleteUser } from "firebase/auth";
-import { doc, getDoc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../../utils/auth-utils";
 
 // Import our new components
 import ProfileCard from "./components/ProfileCard";
-import ProfileActions from "./components/ProfileActions";
-import DeleteAccountModal from "./components/DeleteAccountModal";
 import ResultModal from "../components/ResultModal";
 import LoadingLogo from "../components/LoadingLogo";
 import { useLoadingDelay } from "../components/useLoadingDelay";
@@ -21,13 +18,9 @@ export default function ProfilePage() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const router = useRouter();
 
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
   const showLoading = useLoadingDelay(loading, 500);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteError, setDeleteError] = useState("");
-  const [password, setPassword] = useState("");
   const [globalMessage, setGlobalMessage] = useState("");
 
   useEffect(() => {
@@ -209,49 +202,6 @@ export default function ProfilePage() {
     fetchUserData();
   }, [router]);
 
-  const handleDeleteAccount = async () => {
-    if (!password.trim()) {
-      setDeleteError("Please enter your password");
-      return;
-    }
-
-    setDeleteLoading(true);
-    setDeleteError("");
-
-    try {
-      const user = auth.currentUser;
-      if (!user) {
-        setDeleteError("No user is currently signed in");
-        return;
-      }
-
-      // Re-authenticate the user
-      const credential = EmailAuthProvider.credential(user.email, password);
-      await reauthenticateWithCredential(user, credential);
-
-      // Delete user document from Firestore
-      const userDocRef = doc(db, "users", user.uid);
-      await deleteDoc(userDocRef);
-
-      // Delete the user account
-      await deleteUser(user);
-
-      // Redirect to login page
-      router.push("/login");
-    } catch (error) {
-      console.error("Error deleting account:", error);
-      if (error.code === "auth/wrong-password") {
-        setDeleteError("Incorrect password. Please try again.");
-      } else if (error.code === "auth/too-many-requests") {
-        setDeleteError("Too many failed attempts. Please try again later.");
-      } else {
-        setDeleteError("Failed to delete account. Please try again.");
-      }
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
   if (showLoading) {
     return (
       <div className="min-h-screen container mx-auto text-[#1F2421] relative">
@@ -327,23 +277,9 @@ export default function ProfilePage() {
           <div className="flex flex-col gap-6">
             {/* Profile Card */}
             <ProfileCard userData={userData} />
-
-            {/* Profile Actions */}
-            <ProfileActions setShowDeleteModal={setShowDeleteModal} />
           </div>
         </div>
       </div>
-
-      {/* Delete Account Modal */}
-      <DeleteAccountModal 
-        showDeleteModal={showDeleteModal}
-        setShowDeleteModal={setShowDeleteModal}
-        handleDeleteAccount={handleDeleteAccount}
-        deleteLoading={deleteLoading}
-        deleteError={deleteError}
-        password={password}
-        setPassword={setPassword}
-      />
 
       {/* Global Message Modal */}
       <ResultModal

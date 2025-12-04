@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Bell } from "lucide-react"
 import { auth, db } from "../../../config/firebaseConfig"
 import { doc, getDoc, updateDoc, setDoc } from "firebase/firestore"
@@ -8,6 +8,8 @@ import { createNotification } from "../../../lib/notifications/NotificationsServ
 import { Navbar } from "../../components/NavBar"
 import { Header } from "../../components/Header"
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../../../utils/auth-utils"
+import { devLog, devError } from "../../../utils/auth-helpers"
+import { saveAuditLog } from "../../../utils/audit-log"
 import ResultModal from "../../components/ResultModal"
 import LoadingLogo from "../../components/LoadingLogo"
 import { useLoadingDelay } from "../../components/useLoadingDelay"
@@ -81,7 +83,7 @@ export default function NotificationSettings() {
             setMachineAlerts(defaultSettings.machineAlerts)
           }
       } catch (error) {
-        console.error("Error loading notification settings:", error)
+        devError("Error loading notification settings:", error)
         setGlobalMessage("Error loading notification settings")
       } finally {
         setLoading(false)
@@ -92,7 +94,7 @@ export default function NotificationSettings() {
   }, [])
 
   // Helper function to save a single setting
-  const saveSetting = async (settingName, value) => {
+  const saveSetting = useCallback(async (settingName, value) => {
     try {
       const user = getCurrentUser()
       const accountId = getUserAccountId()
@@ -111,14 +113,14 @@ export default function NotificationSettings() {
       
       return docId
     } catch (error) {
-      console.error(`Error saving ${settingName}:`, error)
+      devError(`Error saving ${settingName}:`, error)
       setGlobalMessage(`Error saving ${settingName}`)
       return false
     }
-  }
+  }, [])
 
   // Handle email notification toggle
-  const handleEmailNotificationToggle = async (enabled) => {
+  const handleEmailNotificationToggle = useCallback(async (enabled) => {
     setEmailNotifications(enabled)
     const docId = await saveSetting('emailNotifications', enabled)
     
@@ -131,8 +133,11 @@ export default function NotificationSettings() {
           "settings_change"
         )
       } catch (error) {
-        console.error('Error creating in-app notification:', error)
+        devError('Error creating in-app notification:', error)
       }
+      
+      // Save audit log
+      await saveAuditLog(docId, 'settings_changed', 'Email notifications enabled')
 
       // Send test email
       try {
@@ -161,11 +166,11 @@ export default function NotificationSettings() {
         
         const emailResult = await emailResponse.json()
         if (emailResult.success) {
-          console.log('Test email sent to:', emailResult.email)
+          devLog('Test email sent to:', emailResult.email)
           setGlobalMessage("Email notifications enabled! Check your inbox for a confirmation email.")
         }
       } catch (emailError) {
-        console.error('Error sending test email:', emailError)
+        devError('Error sending test email:', emailError)
         setGlobalMessage("Email notifications enabled, but test email failed to send.")
       }
     } else if (docId && !enabled) {
@@ -176,18 +181,21 @@ export default function NotificationSettings() {
           "Email notifications have been disabled. You will no longer receive email alerts.",
           "settings_change"
         )
-        setGlobalMessage("Email notifications disabled.")
       } catch (error) {
-        console.error('Error creating in-app notification:', error)
+        devError('Error creating in-app notification:', error)
       }
+      
+      // Save audit log
+      await saveAuditLog(docId, 'settings_changed', 'Email notifications disabled')
+      setGlobalMessage("Email notifications disabled.")
     }
 
     // Clear message after 3 seconds
     setTimeout(() => setGlobalMessage(""), 3000)
-  }
+  }, [saveSetting])
 
   // Handle in-app notification toggle
-  const handleInAppNotificationToggle = async (enabled) => {
+  const handleInAppNotificationToggle = useCallback(async (enabled) => {
     setInAppNotifications(enabled)
     const docId = await saveSetting('inAppNotifications', enabled)
     
@@ -201,7 +209,7 @@ export default function NotificationSettings() {
         )
         setGlobalMessage("In-app notifications enabled!")
       } catch (error) {
-        console.error('Error creating in-app notification:', error)
+        devError('Error creating in-app notification:', error)
       }
     } else if (docId && !enabled) {
       // Just show message (can't create in-app notification if they're disabling it)
@@ -210,43 +218,45 @@ export default function NotificationSettings() {
 
     // Clear message after 3 seconds
     setTimeout(() => setGlobalMessage(""), 3000)
-  }
+  }, [saveSetting])
 
   // Handle other toggles
-  const handleMasterToggle = async (enabled) => {
+  const handleMasterToggle = useCallback(async (enabled) => {
     setNotificationsEnabled(enabled)
     const docId = await saveSetting('notificationsEnabled', enabled)
     
-    if (docId) {
+      if (docId) {
       if (enabled) {
         await createNotification(
           docId,
           "All notifications have been enabled.",
           "settings_change"
         )
+        await saveAuditLog(docId, 'settings_changed', 'All notifications enabled')
         setGlobalMessage("All notifications enabled!")
       } else {
+        await saveAuditLog(docId, 'settings_changed', 'All notifications disabled')
         setGlobalMessage("All notifications disabled.")
       }
       setTimeout(() => setGlobalMessage(""), 3000)
     }
-  }
+  }, [saveSetting])
 
-  const handleDefectAlertsToggle = async (enabled) => {
+  const handleDefectAlertsToggle = useCallback(async (enabled) => {
     setDefectAlerts(enabled)
     await saveSetting('defectAlerts', enabled)
     setGlobalMessage(enabled ? "Defect alerts enabled!" : "Defect alerts disabled.")
     setTimeout(() => setGlobalMessage(""), 3000)
-  }
+  }, [saveSetting])
 
-  const handleMachineAlertsToggle = async (enabled) => {
+  const handleMachineAlertsToggle = useCallback(async (enabled) => {
     setMachineAlerts(enabled)
     await saveSetting('machineAlerts', enabled)
     setGlobalMessage(enabled ? "Machine alerts enabled!" : "Machine alerts disabled.")
     setTimeout(() => setGlobalMessage(""), 3000)
-  }
+  }, [saveSetting])
 
-  const handlePushNotificationToggle = async (enabled) => {
+  const handlePushNotificationToggle = useCallback(async (enabled) => {
     try {
       const user = getCurrentUser()
       const storedUser = getStoredUser()
@@ -278,9 +288,9 @@ export default function NotificationSettings() {
               "Push notifications have been enabled. You will now receive browser notifications from MEGG!",
               "settings_change"
             )
-            console.log('In-app notification created for push notifications enabled')
+            devLog('In-app notification created for push notifications enabled')
           } catch (error) {
-            console.error('Error creating in-app notification:', error)
+            devError('Error creating in-app notification:', error)
           }
           
           // Send a push notification confirming it's enabled
@@ -305,11 +315,14 @@ export default function NotificationSettings() {
             })
             
             if (response.ok) {
-              console.log('Push notification confirmation sent')
+              devLog('Push notification confirmation sent')
             }
           } catch (error) {
-            console.error('Error sending push notification confirmation:', error)
+            devError('Error sending push notification confirmation:', error)
           }
+          
+          // Save audit log
+          await saveAuditLog(docId, 'settings_changed', 'Push notifications enabled')
           
           setGlobalMessage("Push notifications enabled successfully! You should receive a test notification.")
         } else {
@@ -334,10 +347,13 @@ export default function NotificationSettings() {
             "Push notifications have been disabled. You will no longer receive browser notifications.",
             "settings_change"
           )
-          console.log('In-app notification created for push notifications disabled')
+          devLog('In-app notification created for push notifications disabled')
         } catch (error) {
-          console.error('Error creating in-app notification:', error)
+          devError('Error creating in-app notification:', error)
         }
+        
+        // Save audit log
+        await saveAuditLog(docId, 'settings_changed', 'Push notifications disabled')
         
         setGlobalMessage("Push notifications disabled")
       }
@@ -345,10 +361,10 @@ export default function NotificationSettings() {
       // Clear message after 3 seconds
       setTimeout(() => setGlobalMessage(""), 3000)
     } catch (error) {
-      console.error("Error toggling push notifications:", error)
+      devError("Error toggling push notifications:", error)
       setGlobalMessage("Error updating push notification settings")
     }
-  }
+  }, [enablePushNotifications, disablePushNotifications])
 
   if (showLoading && !notificationsEnabled) {
     return (

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback } from "react"
 import { Save, SaveOff, TriangleAlert } from "lucide-react"
 import { auth, db } from "../../../config/firebaseConfig"
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth"
@@ -9,6 +9,10 @@ import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { Navbar } from "../../components/NavBar"
 import { Header } from "../../components/Header"
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../../../utils/auth-utils"
+import { devLog, devError } from "../../../utils/auth-helpers"
+import { saveAuditLog } from "../../../utils/audit-log"
+import { getPasswordStrength } from "../../../utils/validation"
+import PasswordStrengthIndicator from "../../../(auth)/components/PasswordStrengthIndicator"
 import bcrypt from "bcryptjs"
 import ResultModal from "../../components/ResultModal"
 
@@ -17,17 +21,20 @@ export default function ChangePasswordPage() {
   const [globalMessage, setGlobalMessage] = useState("")
   const [errors, setErrors] = useState({})
   const [loading, setLoading] = useState(false)
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, level: 'weak' })
   const [formData, setFormData] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   })
 
-  const validate = (name, value) => {
+  const validate = useCallback((name, value) => {
     const validationErrors = { ...errors }
 
     if (name === "newPassword") {
       validationErrors.newPassword = value.length < 8 ? "Password must be at least 8 characters long." : ""
+      // Update password strength
+      setPasswordStrength(getPasswordStrength(value))
     }
 
     if (name === "confirmPassword") {
@@ -35,13 +42,13 @@ export default function ChangePasswordPage() {
     }
 
     setErrors(validationErrors)
-  }
+  }, [errors, formData.newPassword])
 
-  const handleChange = (event) => {
+  const handleChange = useCallback((event) => {
     const { name, value } = event.target
-    setFormData({ ...formData, [name]: value })
+    setFormData((prev) => ({ ...prev, [name]: value }))
     validate(name, value)
-  }
+  }, [validate])
 
 
   const handleSubmit = async (event) => {
@@ -110,6 +117,14 @@ export default function ChangePasswordPage() {
           passwordUpdatedAt: new Date().toISOString()
         })
 
+        // Save audit log
+        await saveAuditLog(
+          docId,
+          'password_changed',
+          'Password was changed successfully',
+          { method: 'custom_auth' }
+        )
+
         setGlobalMessage("Password updated successfully!")
       } else {
         // User uses Firebase Auth - use Firebase's password update
@@ -130,6 +145,14 @@ export default function ChangePasswordPage() {
         await updateDoc(userDocRef, {
           passwordUpdatedAt: new Date().toISOString()
         })
+
+        // Save audit log
+        await saveAuditLog(
+          docId,
+          'password_changed',
+          'Password was changed successfully',
+          { method: 'firebase_auth' }
+        )
 
         setGlobalMessage("Password updated successfully!")
       }
@@ -285,11 +308,19 @@ export default function ChangePasswordPage() {
           <Header setSidebarOpen={setSidebarOpen} />
 
           {/* Main container */}
-          <div className="flex flex-col gap-6">
-            <div className="bg-white border border-gray-300 rounded-2xl shadow p-6">
-              <h2 className="text-xl font-bold text-[#1F2421] mb-6">Change Password</h2>
+          <div className="flex flex-col gap-4 sm:gap-6">
+            {/* Change Password Form Card - White & Clean */}
+            <div className="bg-white border border-gray-300 rounded-lg shadow p-6">
+              {/* Header inside card */}
+              <div className="mb-6">
+                <h2 className="text-lg sm:text-xl font-semibold">Change Password</h2>
+                <p className="text-gray-500 text-xs sm:text-sm mt-1">
+                  Update your password to keep your account secure
+                </p>
+              </div>
               
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {/* Current Password */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Current Password
@@ -299,12 +330,13 @@ export default function ChangePasswordPage() {
                     name="currentPassword"
                     value={formData.currentPassword}
                     onChange={handleChange}
-                    className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#105588] focus:border-[#105588] transition-all duration-200"
+                    className="w-full p-3 sm:p-4 bg-gray-50 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-sm sm:text-base"
                     placeholder="Enter your current password"
                     required
                   />
                 </div>
 
+                {/* New Password */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     New Password
@@ -314,17 +346,20 @@ export default function ChangePasswordPage() {
                     name="newPassword"
                     value={formData.newPassword}
                     onChange={handleChange}
-                    className={`w-full p-4 bg-gray-50 border rounded-2xl focus:ring-2 focus:ring-[#105588] focus:border-[#105588] transition-all duration-200 ${
-                      errors.newPassword ? "border-[#FF4A08]" : "border-gray-200"
+                    className={`w-full p-3 sm:p-4 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-sm sm:text-base ${
+                      errors.newPassword ? "border-red-400" : "border-gray-300"
                     }`}
                     placeholder="Enter your new password"
                     required
                   />
+                  {/* Password Strength Indicator */}
+                  <PasswordStrengthIndicator strength={passwordStrength} password={formData.newPassword} />
                   {errors.newPassword && (
-                    <p className="text-red-500 text-sm mt-1">{errors.newPassword}</p>
+                    <p className="text-red-600 text-xs sm:text-sm mt-1">{errors.newPassword}</p>
                   )}
                 </div>
 
+                {/* Confirm Password */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Confirm New Password
@@ -334,58 +369,47 @@ export default function ChangePasswordPage() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`w-full p-4 bg-gray-50 border rounded-2xl focus:ring-2 focus:ring-[#105588] focus:border-[#105588] transition-all duration-200 ${
-                      errors.confirmPassword ? "border-[#FF4A08]" : "border-gray-200"
+                    className={`w-full p-3 sm:p-4 bg-gray-50 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-sm sm:text-base ${
+                      errors.confirmPassword ? "border-red-400" : "border-gray-300"
                     }`}
                     placeholder="Confirm your new password"
                     required
                   />
                   {errors.confirmPassword && (
-                    <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>
+                    <p className="text-red-600 text-xs sm:text-sm mt-1">{errors.confirmPassword}</p>
                   )}
                 </div>
 
-                <div className="flex justify-end">
+                {/* Submit Button */}
+                <div className="flex justify-end pt-2">
                   <button
                     type="submit"
                     disabled={loading || !hasValidForm()}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-semibold transition-colors duration-200 ${
+                    className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors duration-150 text-xs sm:text-sm font-medium ${
                       hasValidForm() && !loading
-                        ? "bg-[#105588] text-white hover:bg-[#0d4470]"
+                        ? "bg-blue-500 text-white hover:bg-blue-600"
                         : "bg-gray-300 text-gray-500 cursor-not-allowed"
                     }`}
                   >
                     {loading ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Updating...
+                        <div className="animate-spin rounded-full h-3.5 w-3.5 sm:h-4 sm:w-4 border-b-2 border-white"></div>
+                        <span className="hidden xs:inline">Updating...</span>
                       </>
                     ) : hasValidForm() ? (
                       <>
-                        <Save className="w-4 h-4" />
-                        Change Password
+                        <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>Change Password</span>
                       </>
                     ) : (
                       <>
-                        <SaveOff className="w-4 h-4" />
-                        Change Password
+                        <SaveOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                        <span>Change Password</span>
                       </>
                     )}
                   </button>
                 </div>
               </form>
-
-              {/* Security Tips */}
-              <div className="mt-8 p-4 bg-gray-50 rounded-2xl border border-gray-200">
-                <h3 className="font-semibold text-[#1F2421] mb-2">Password Security Tips</h3>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Use at least 8 characters</li>
-                  <li>• Include uppercase and lowercase letters</li>
-                  <li>• Add numbers and special characters</li>
-                  <li>• Avoid common words or personal information</li>
-                  <li>• Don&apos;t reuse passwords from other accounts</li>
-                </ul>
-              </div>
             </div>
           </div>
         </div>

@@ -105,32 +105,32 @@ export default function QRCodeModal({
   }
 
   return (
-    <div className="flex flex-col gap-6 w-full xl:w-80">
+    <div className="flex flex-col gap-4 sm:gap-6 w-full xl:w-80">
       {/* QR Code section */}
-      <div className="flex flex-col gap-4 border border-gray-300 rounded-lg p-4">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-500">
-            <QrCode className="w-4 h-4" />
+      <div className="flex flex-col gap-3 sm:gap-4 border border-gray-300 rounded-lg p-3 sm:p-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-green-100 rounded-full flex items-center justify-center text-green-500 flex-shrink-0">
+            <QrCode className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </div>
-          <h3 className="font-medium">QR Code</h3>
+          <h3 className="font-medium text-sm sm:text-base">QR Code</h3>
         </div>
 
         {qrCodeLoading ? (
-          <div className="flex items-center justify-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500"></div>
+          <div className="flex items-center justify-center py-6 sm:py-8">
+            <div className="animate-spin rounded-full h-7 w-7 sm:h-8 sm:w-8 border-b-2 border-green-500"></div>
           </div>
         ) : qrCodeDataUrl ? (
-          <div className="flex flex-col gap-4 items-center">
-            <div className="border border-gray-200 rounded-lg p-4 bg-white">
+          <div className="flex flex-col gap-3 sm:gap-4 items-center">
+            <div className="border border-gray-200 rounded-lg p-3 sm:p-4 bg-white">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={qrCodeDataUrl}
                 alt={`QR Code for batch ${selectedBatch}`}
-                className="w-48 h-48"
+                className="w-40 h-40 sm:w-48 sm:h-48"
                 style={{ imageRendering: 'pixelated' }}
               />
             </div>
-            <p className="text-xs text-gray-500 text-center max-w-xs">
+            <p className="text-xs text-gray-500 text-center max-w-xs px-2">
               Scan this QR code to view batch details on any device
             </p>
             
@@ -138,14 +138,14 @@ export default function QRCodeModal({
             <div className="grid grid-cols-2 gap-2 w-full">
               <button
                 onClick={printQRCode}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-[#105588] text-white rounded-lg hover:bg-[#0d4470] transition-colors duration-150 text-sm font-medium"
+                className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-[#105588] text-white rounded-lg hover:bg-[#0d4470] transition-colors duration-150 text-xs sm:text-sm font-medium"
               >
-                <Printer className="w-4 h-4" />
-                Print
+                <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span>Print</span>
               </button>
               <button
                 onClick={downloadQRCode}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150 text-sm font-medium"
+                className="px-3 sm:px-4 py-1.5 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150 text-xs sm:text-sm font-medium"
               >
                 Download
               </button>
@@ -154,26 +154,26 @@ export default function QRCodeModal({
             {/* Copy URL Button */}
             <button
               onClick={() => copyBatchUrl(selectedBatch)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-150 text-sm font-medium border border-gray-300"
+              className="w-full flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-150 text-xs sm:text-sm font-medium border border-gray-300"
             >
-              <Link2 className="w-4 h-4" />
-              Copy Batch URL
+              <Link2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <span>Copy Batch URL</span>
             </button>
           </div>
         ) : (
-          <div className="flex items-center justify-center py-8 text-gray-500">
-            <p className="text-sm">Failed to generate QR code</p>
+          <div className="flex items-center justify-center py-6 sm:py-8 text-gray-500">
+            <p className="text-xs sm:text-sm">Failed to generate QR code</p>
           </div>
         )}
       </div>
 
       {/* Batch info */}
-      <div className="flex flex-col gap-4 border border-gray-300 rounded-lg p-4">
-        <h3 className="font-medium">Selected Batch</h3>
+      <div className="flex flex-col gap-3 sm:gap-4 border border-gray-300 rounded-lg p-3 sm:p-4">
+        <h3 className="font-medium text-sm sm:text-base">Selected Batch</h3>
         <div className="flex flex-col gap-2">
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-gray-500">Batch Number:</span>
-            <span className="text-sm font-medium">{selectedBatch}</span>
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-xs sm:text-sm text-gray-500">Batch Number:</span>
+            <span className="text-xs sm:text-sm font-medium truncate">{selectedBatch}</span>
           </div>
         </div>
       </div>

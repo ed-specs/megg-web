@@ -33,12 +33,15 @@ function generateNotificationId(accountId) {
 // Check if notifications are enabled before creating
 async function checkNotificationSettings(userId, type) {
   try {
-    // Always allow login, password, settings, and profile-related notifications
+    // Always allow login, logout, password, settings, and profile-related notifications
     if (type === "login" || 
+        type === "logout" ||
         type === "password_change" ||
         type === "settings_change" ||
+        type === "security_session_revoked" ||
         type.includes("password") ||
         type.includes("settings") ||
+        type.includes("security") ||
         type.includes("profile") || 
         type.includes("name_updated") || 
         type.includes("email_updated") || 
@@ -167,6 +170,7 @@ export async function createNotification(accountId, message, type, read = false)
     // Set icon based on notification type
     const iconMap = {
       "login": "login",
+      "logout": "logout",
       "password_change": "lock",
       "settings_change": "settings",
       "farm_info_updated": "farm",
@@ -194,6 +198,10 @@ export async function createNotification(accountId, message, type, read = false)
       "batch_list_exported": "download",
       "batch_details_exported": "download",
       "batch_export_failed": "alert",
+      // Security notifications
+      "security_session_revoked": "shield",
+      // Farm notifications
+      "farm_primary_changed": "building",
     }
 
     // Check if this notification type should use an icon

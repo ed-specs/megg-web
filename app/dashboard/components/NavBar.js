@@ -19,6 +19,7 @@ import {
   UserPen,
   KeyRound,
   MonitorCog,
+  Shield,
   User,
   LogOut,
 } from "lucide-react";
@@ -26,6 +27,7 @@ import { auth, db } from "../../config/firebaseConfig.js";
 import { doc, getDoc } from "firebase/firestore";
 import { signOutUser, debugAuthState } from "../../utils/auth-utils";
 import NotificationMobile from "../../components/ui/NotificationMobile.js";
+import { saveInAppNotification } from "../../utils/notification-utils";
 
 export function Navbar() {
   const router = useRouter();
@@ -132,6 +134,12 @@ export function Navbar() {
 
   const handleSignOut = async () => {
     try {
+      // Create logout notification before signing out
+      await saveInAppNotification(
+        "You have successfully signed out of your account.",
+        "logout"
+      );
+      
       await signOutUser();
       router.push("/login"); // Redirect to login page after sign out
     } catch (error) {
@@ -182,6 +190,11 @@ export function Navbar() {
       name: "Change password",
       href: "/dashboard/settings/change-password",
       icon: KeyRound,
+    },
+    {
+      name: "Security",
+      href: "/dashboard/settings/security",
+      icon: Shield,
     },
     {
       name: "Preferences",
