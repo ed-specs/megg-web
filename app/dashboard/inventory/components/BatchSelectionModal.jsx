@@ -141,20 +141,13 @@ export default function BatchSelectionModal({
         {/* Footer with Export Options */}
         <div className="p-4 border-t border-gray-200 bg-gray-50">
           <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <button
                 onClick={() => handleExport('csv')}
                 disabled={isExporting}
                 className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
               >
                 {isExporting ? 'Exporting...' : 'Export as CSV'}
-              </button>
-              <button
-                onClick={() => handleExport('excel')}
-                disabled={isExporting}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
-              >
-                {isExporting ? 'Exporting...' : 'Export as Excel'}
               </button>
               <button
                 onClick={() => handleExport('pdf')}

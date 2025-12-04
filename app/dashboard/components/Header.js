@@ -1,5 +1,5 @@
 "use client";
-import { Bell, Menu, Trash2, X, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings } from "lucide-react";
+import { Bell, Menu, Trash2, X, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, Check, AlertTriangle, RefreshCw, Filter } from "lucide-react";
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -326,7 +326,28 @@ export  function Header({ setSidebarOpen }) {
                           >
                             {/* image or icon */}
                             <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                              {notif.icon === "login" ? (
+                              {/* Export notifications - Download icon */}
+                              {(notif.icon === "download" || 
+                                notif.type === "batch_list_exported" || 
+                                notif.type === "batch_details_exported") ? (
+                                <div className="w-12 h-12 bg-green-500 flex items-center justify-center rounded-full">
+                                  <Download className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              /* Error/Alert notifications - Alert icon */
+                              ) : (notif.icon === "alert" || 
+                                     notif.type === "batch_export_failed" ||
+                                     notif.type === "batch_status_update_failed" ||
+                                     notif.type === "inventory_refresh_failed" ||
+                                     notif.type === "inventory_load_failed") ? (
+                                <div className="w-12 h-12 bg-red-500 flex items-center justify-center rounded-full">
+                                  <AlertTriangle className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              /* Status update - Check icon */
+                              ) : (notif.icon === "check" || notif.type === "batch_status_updated") ? (
+                                <div className="w-12 h-12 bg-emerald-500 flex items-center justify-center rounded-full">
+                                  <Check className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notif.icon === "login" ? (
                                 <div className="w-12 h-12 bg-[#105588] flex items-center justify-center rounded-full">
                                   <LogIn className="w-5 h-5 text-white" strokeWidth={2.5} />
                                 </div>
@@ -366,14 +387,26 @@ export  function Header({ setSidebarOpen }) {
                                 <div className="w-12 h-12 bg-gray-500 flex items-center justify-center rounded-full">
                                   <Settings className="w-5 h-5 text-white" strokeWidth={2.5} />
                                 </div>
-                              ) : (
+                              ) : notif.icon === "refresh" ? (
+                                <div className="w-12 h-12 bg-blue-500 flex items-center justify-center rounded-full">
+                                  <RefreshCw className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notif.icon === "filter" ? (
+                                <div className="w-12 h-12 bg-yellow-500 flex items-center justify-center rounded-full">
+                                  <Filter className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notif.profileImage ? (
                                 <Image
-                                  src={notif.profileImage || "/default.png"}
+                                  src={notif.profileImage}
                                   alt="Profile"
                                   width={48}
                                   height={48}
                                   className="rounded-full object-cover w-12 h-12"
                                 />
+                              ) : (
+                                <div className="w-12 h-12 bg-gray-400 flex items-center justify-center rounded-full">
+                                  <Bell className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
                               )}
                             </div>
                             {/* description */}

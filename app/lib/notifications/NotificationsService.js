@@ -181,6 +181,18 @@ export async function createNotification(accountId, message, type, read = false)
       "birthday_updated": "calendar",
       "age_updated": "calendar",
       "gender_updated": "user",
+      // Inventory notifications
+      "inventory_data_filtered": "filter",
+      "inventory_refreshed": "refresh",
+      "inventory_refresh_failed": "alert",
+      "inventory_load_failed": "alert",
+      // Batch notifications
+      "batch_status_updated": "check",
+      "batch_status_update_failed": "alert",
+      // Export notifications
+      "batch_list_exported": "download",
+      "batch_details_exported": "download",
+      "batch_export_failed": "alert",
     }
 
     // Check if this notification type should use an icon
@@ -208,6 +220,7 @@ export async function createNotification(accountId, message, type, read = false)
     
     console.log(`✅ Notification created: ${notificationId} for account ${accountId}`)
     console.log(`   Message: ${message}, Type: ${type}`)
+    console.log(`   Icon: ${notificationData.icon || 'none'}, ProfileImage: ${notificationData.profileImage || 'none'}`)
     
     return notificationId
   } catch (error) {
@@ -232,8 +245,8 @@ export async function getUserNotifications(accountId, limitCount = 10) {
         id: doc.id,
         message: data.message,
         read: data.read || false,
-        profileImage: data.profileImage || "/default.png",
-        icon: data.icon || null, // Include icon field for login notifications
+        profileImage: data.profileImage || null, // Only set if exists, don't default to /default.png
+        icon: data.icon || null, // Include icon field
         type: data.type,
         accountId: data.accountId,
         createdAt: data.createdAt 

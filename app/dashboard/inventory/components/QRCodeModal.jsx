@@ -1,10 +1,11 @@
-import { QrCode, Printer } from "lucide-react";
+import { QrCode, Printer, Link2 } from "lucide-react";
 
 export default function QRCodeModal({ 
   selectedBatch, 
   qrCodeDataUrl, 
   qrCodeLoading, 
-  downloadQRCode 
+  downloadQRCode,
+  copyBatchUrl
 }) {
   // Print QR Code - Multiple small QR codes per page
   const printQRCode = () => {
@@ -125,26 +126,38 @@ export default function QRCodeModal({
                 src={qrCodeDataUrl}
                 alt={`QR Code for batch ${selectedBatch}`}
                 className="w-48 h-48"
+                style={{ imageRendering: 'pixelated' }}
               />
             </div>
             <p className="text-xs text-gray-500 text-center max-w-xs">
               Scan this QR code to view batch details on any device
             </p>
-            <div className="flex gap-2">
+            
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-2 w-full">
               <button
                 onClick={printQRCode}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#105588] text-white rounded-lg hover:bg-[#0d4470] transition-colors duration-150 text-sm font-medium"
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-[#105588] text-white rounded-lg hover:bg-[#0d4470] transition-colors duration-150 text-sm font-medium"
               >
                 <Printer className="w-4 h-4" />
                 Print
               </button>
               <button
                 onClick={downloadQRCode}
-                className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150 text-sm font-medium"
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors duration-150 text-sm font-medium"
               >
                 Download
               </button>
             </div>
+            
+            {/* Copy URL Button */}
+            <button
+              onClick={() => copyBatchUrl(selectedBatch)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-150 text-sm font-medium border border-gray-300"
+            >
+              <Link2 className="w-4 h-4" />
+              Copy Batch URL
+            </button>
           </div>
         ) : (
           <div className="flex items-center justify-center py-8 text-gray-500">

@@ -13,7 +13,7 @@ import { Navbar } from "../../components/NavBar"
 import { Header } from "../../components/Header"
 import { useRouter } from "next/navigation"
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../../../utils/auth-utils"
-import ImageEditor from "../../components/ImageEditor"
+import ImageEditor from "../../../components/ImageEditor"
 import ResultModal from "../../components/ResultModal"
 
 export default function EditProfile() {

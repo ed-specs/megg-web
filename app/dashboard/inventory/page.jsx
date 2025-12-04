@@ -2,11 +2,15 @@
 
 import { Navbar } from "../components/NavBar";
 import { Header } from "../components/Header";
-import { useState, useRef, useEffect } from "react";
-import { RefreshCw, Download } from "lucide-react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { RefreshCw, Download, Package, Egg, AlertTriangle, CheckCircle, GitCompare, TrendingUp } from "lucide-react";
 import LoadingLogo from "../components/LoadingLogo";
+import ResultModal from "../components/ResultModal";
 import { useLoadingDelay } from "../components/useLoadingDelay";
 import { exportInventoryBatches, exportBatchDetailsPDF, exportBatchOverviewImage, exportToImage } from "../../utils/export-utils";
+import { devLog, devError } from "../../utils/auth-helpers";
+import { isValidBatch, safeGet, safeFormatNumber, safePercentage, safeFormatDate } from "../../utils/data-helpers";
+import { saveInAppNotification } from "../../utils/notification-utils";
 
 import { getMachineLinkedInventoryData, getMachineLinkedBatchDetails, updateBatchStatus } from "../../lib/inventory/InventoryData";
 import QRCode from 'qrcode';
@@ -18,6 +22,10 @@ import InventoryPagination from "./components/InventoryPagination";
 import QRCodeModal from "./components/QRCodeModal";
 import InventorySearchAndFilter from "./components/InventorySearchAndFilter";
 import BatchSelectionModal from "./components/BatchSelectionModal";
+import StatCard from "./components/StatCard";
+import TrendsChart from "./components/TrendsChart";
+import BatchComparisonModal from "./components/BatchComparisonModal";
+import BatchComparisonSelectionModal from "./components/BatchComparisonSelectionModal";
 
 export default function InventoryPage() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
@@ -35,6 +43,9 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const showLoading = useLoadingDelay(loading, 500);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Result modal state
+  const [resultMessage, setResultMessage] = useState("");
 
   // Search and Filter state
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,22 +74,85 @@ export default function InventoryPage() {
   const exportDropdownRef = useRef(null);
   const batchOverviewRef = useRef(null);
 
+  // Analytics & Comparison state
+  const [showInsights, setShowInsights] = useState(false);
+  const [compareBatches, setCompareBatches] = useState([]);
+  const [showComparisonSelectionModal, setShowComparisonSelectionModal] = useState(false);
+  const [showComparisonModal, setShowComparisonModal] = useState(false);
+  const [comparisonOverviewData, setComparisonOverviewData] = useState({});
+
+  // Restore filters from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('inventory-filters');
+      if (saved) {
+        const filters = JSON.parse(saved);
+        devLog("Inventory: Restoring saved filters", filters);
+        
+        if (filters.searchQuery !== undefined) setSearchQuery(filters.searchQuery);
+        if (filters.dateFrom !== undefined) setDateFrom(filters.dateFrom);
+        if (filters.dateTo !== undefined) setDateTo(filters.dateTo);
+        if (filters.statusFilter !== undefined) setStatusFilter(filters.statusFilter);
+        if (filters.defectRateThreshold !== undefined) setDefectRateThreshold(filters.defectRateThreshold);
+        if (filters.sizeFilters !== undefined) setSizeFilters(filters.sizeFilters);
+        if (filters.sortBy !== undefined) setSortBy(filters.sortBy);
+        if (filters.sortDirection !== undefined) setSortDirection(filters.sortDirection);
+      }
+    } catch (error) {
+      devError("Inventory: Error restoring filters from localStorage", error);
+    }
+  }, []); // Only run on mount
+
+  // Save filters to localStorage whenever they change
+  useEffect(() => {
+    try {
+      const filters = {
+        searchQuery,
+        dateFrom,
+        dateTo,
+        statusFilter,
+        defectRateThreshold,
+        sizeFilters,
+        sortBy,
+        sortDirection
+      };
+      localStorage.setItem('inventory-filters', JSON.stringify(filters));
+      devLog("Inventory: Saved filters to localStorage", filters);
+    } catch (error) {
+      devError("Inventory: Error saving filters to localStorage", error);
+    }
+  }, [searchQuery, dateFrom, dateTo, statusFilter, defectRateThreshold, sizeFilters, sortBy, sortDirection]);
+
   // Fetch inventory data
   useEffect(() => {
     const fetchInventoryData = async () => {
       try {
         setLoading(true);
-        console.log("Inventory: Starting to fetch inventory data...");
+        devLog("Inventory: Starting to fetch inventory data...");
         
         // Fetch inventory data only for machines linked to the current user
         const inventoryData = await getMachineLinkedInventoryData();
-        console.log("Inventory: Fetched inventory data:", inventoryData.length, "batches");
-        setBatchReviews(inventoryData);
+        devLog("Inventory: Fetched inventory data:", inventoryData.length, "batches");
+        
+        // Validate and filter out invalid batches
+        const validBatches = inventoryData.filter(isValidBatch);
+        const invalidCount = inventoryData.length - validBatches.length;
+        
+        if (invalidCount > 0) {
+          devLog(`Inventory: Filtered out ${invalidCount} invalid batch(es)`);
+        }
+        
+        setBatchReviews(validBatches);
         
         setLoading(false);
-        console.log("Inventory: Inventory data fetch completed successfully");
+        devLog("Inventory: Inventory data fetch completed successfully");
       } catch (error) {
-        console.error("Inventory: Error fetching inventory data:", error);
+        devError("Inventory: Error fetching inventory data:", error);
+        setResultMessage("Failed to load inventory data. Please refresh the page.");
+        await saveInAppNotification(
+          'Failed to load inventory data. Please refresh the page.',
+          'inventory_load_failed'
+        );
         setLoading(false);
       }
     };
@@ -95,12 +169,13 @@ export default function InventoryPage() {
       }
 
       try {
-        console.log("Inventory: Fetching batch details for:", selectedBatch);
+        devLog("Inventory: Fetching batch details for:", selectedBatch);
         const batchDetails = await getMachineLinkedBatchDetails(selectedBatch);
-        console.log("Inventory: Fetched batch details:", batchDetails);
+        devLog("Inventory: Fetched batch details:", batchDetails);
         setOverviewData(batchDetails);
       } catch (error) {
-        console.error("Inventory: Error fetching batch details:", error);
+        devError("Inventory: Error fetching batch details:", error);
+        setResultMessage("Failed to load batch details. Please try again.");
         setOverviewData(null);
       }
     };
@@ -108,8 +183,8 @@ export default function InventoryPage() {
     fetchBatchDetails();
   }, [selectedBatch]);
 
-  // Generate QR Code
-  const generateQRCode = async (batchNumber) => {
+  // Generate QR Code (memoized)
+  const generateQRCode = useCallback(async (batchNumber) => {
     try {
       setQrCodeLoading(true);
       // Generate URL that points to batch detail page
@@ -128,26 +203,33 @@ export default function InventoryPage() {
       setQrCodeDataUrl(qrCodeUrl);
       setQrCodeLoading(false);
     } catch (error) {
-      console.error('Error generating QR code:', error);
+      devError('Error generating QR code:', error);
+      setResultMessage("Failed to generate QR code. Please try again.");
       setQrCodeDataUrl(null);
       setQrCodeLoading(false);
     }
-  };
+  }, []);
 
-  // Download QR Code
-  const downloadQRCode = () => {
+  // Download QR Code (memoized)
+  const downloadQRCode = useCallback(() => {
     if (!qrCodeDataUrl || !selectedBatch) return;
     
-    const link = document.createElement('a');
-    link.download = `QR_Code_${selectedBatch}_${new Date().toISOString().split('T')[0]}.png`;
-    link.href = qrCodeDataUrl;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+    try {
+      const link = document.createElement('a');
+      link.download = `QR_Code_${selectedBatch}_${new Date().toISOString().split('T')[0]}.png`;
+      link.href = qrCodeDataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setResultMessage("QR Code downloaded successfully!");
+    } catch (error) {
+      devError("Error downloading QR code:", error);
+      setResultMessage("Failed to download QR code. Please try again.");
+    }
+  }, [qrCodeDataUrl, selectedBatch]);
 
-  // Handle batch selection
-  const handleBatchSelect = (batchNumber) => {
+  // Handle batch selection (memoized)
+  const handleBatchSelect = useCallback((batchNumber) => {
     if (selectedBatch === batchNumber) {
       setSelectedBatch(null); // Deselect if already selected
       setQrCodeDataUrl(null); // Clear QR code
@@ -156,43 +238,81 @@ export default function InventoryPage() {
       setSelectedBatches([]); // Clear bulk selection when opening detail
       generateQRCode(batchNumber); // Generate QR code for new selection
     }
-  };
+  }, [selectedBatch, generateQRCode]);
 
-  // Refresh data
-  const refreshData = async () => {
+  // Refresh data (memoized)
+  const refreshData = useCallback(async () => {
     setIsRefreshing(true);
     try {
       const inventoryData = await getMachineLinkedInventoryData();
-      setBatchReviews(inventoryData);
+      
+      // Validate batches
+      const validBatches = inventoryData.filter(isValidBatch);
+      setBatchReviews(validBatches);
       
       // If a batch is selected, refresh its details too
       if (selectedBatch) {
         const batchDetails = await getMachineLinkedBatchDetails(selectedBatch);
         setOverviewData(batchDetails);
       }
+      
+      setResultMessage("Inventory data refreshed successfully!");
     } catch (error) {
-      console.error("Error refreshing inventory data:", error);
+      devError("Error refreshing inventory data:", error);
+      setResultMessage("Failed to refresh inventory data. Please try again.");
+      await saveInAppNotification(
+        'Could not refresh inventory data. Please try again.',
+        'inventory_refresh_failed'
+      );
     }
     setIsRefreshing(false);
-  };
+  }, [selectedBatch]);
 
-  // Calculate defect rate for a batch
-  const calculateDefectRate = (batch) => {
-    if (!batch.totalEggs || batch.totalEggs === 0) return 0;
-    const defectEggs = batch.eggSizes?.Defect || 0;
-    return (defectEggs / batch.totalEggs) * 100;
-  };
+  // Calculate defect rate for a batch (memoized with safe data access)
+  const calculateDefectRate = useCallback((batch) => {
+    const totalEggs = safeGet(batch, 'totalEggs', 0);
+    const defectEggs = safeGet(batch, 'eggSizes.Defect', 0);
+    
+    if (totalEggs === 0) return 0;
+    return (defectEggs / totalEggs) * 100;
+  }, []);
 
-  // Filter and sort batches
-  const filteredAndSortedBatches = batchReviews
+  // Calculate quick stats (memoized)
+  const quickStats = useMemo(() => {
+    const totalBatches = batchReviews.length
+    const totalEggs = batchReviews.reduce((sum, batch) => sum + (safeGet(batch, 'totalEggs', 0)), 0)
+    const activeBatches = batchReviews.filter(batch => 
+      safeGet(batch, 'status', 'active').toLowerCase() === 'active'
+    ).length
+    
+    // Calculate average defect rate
+    const defectRates = batchReviews.map(batch => calculateDefectRate(batch))
+    const avgDefectRate = defectRates.length > 0 
+      ? (defectRates.reduce((sum, rate) => sum + rate, 0) / defectRates.length).toFixed(2)
+      : '0.00'
+    
+    return {
+      totalBatches,
+      totalEggs,
+      activeBatches,
+      avgDefectRate
+    }
+  }, [batchReviews, calculateDefectRate])
+
+  // Filter and sort batches (memoized to prevent expensive recalculation)
+  const filteredAndSortedBatches = useMemo(() => batchReviews
     .filter((batch) => {
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        const matchesBatchNumber = batch.batchNumber?.toLowerCase().includes(query);
+        const batchNumber = safeGet(batch, 'batchNumber', '');
+        const fromDate = safeGet(batch, 'fromDate', '');
+        const toDate = safeGet(batch, 'toDate', '');
+        
+        const matchesBatchNumber = batchNumber.toLowerCase().includes(query);
         const matchesDate = 
-          batch.fromDate?.toLowerCase().includes(query) ||
-          batch.toDate?.toLowerCase().includes(query);
+          fromDate.toLowerCase().includes(query) ||
+          toDate.toLowerCase().includes(query);
         if (!matchesBatchNumber && !matchesDate) {
           return false;
         }
@@ -200,13 +320,19 @@ export default function InventoryPage() {
 
       // Date range filter
       if (dateFrom) {
-        const batchDate = new Date(batch.fromDate);
+        const batchFromDate = safeGet(batch, 'fromDate', null);
+        if (!batchFromDate) return false;
+        
+        const batchDate = new Date(batchFromDate);
         const fromDate = new Date(dateFrom);
         fromDate.setHours(0, 0, 0, 0);
         if (batchDate < fromDate) return false;
       }
       if (dateTo) {
-        const batchDate = new Date(batch.toDate || batch.fromDate);
+        const batchToDate = safeGet(batch, 'toDate', null) || safeGet(batch, 'fromDate', null);
+        if (!batchToDate) return false;
+        
+        const batchDate = new Date(batchToDate);
         const toDate = new Date(dateTo);
         toDate.setHours(23, 59, 59, 999);
         if (batchDate > toDate) return false;
@@ -214,7 +340,7 @@ export default function InventoryPage() {
 
       // Status filter
       if (statusFilter !== "all") {
-        const batchStatus = (batch.status || "active").toLowerCase();
+        const batchStatus = safeGet(batch, 'status', 'active').toLowerCase();
         const filterStatus = statusFilter.toLowerCase();
         
         // Normalize status: "active" vs anything else is "not active"
@@ -235,7 +361,7 @@ export default function InventoryPage() {
       // Size filters
       if (sizeFilters.length > 0) {
         const hasSelectedSize = sizeFilters.some((size) => {
-          const count = batch.eggSizes?.[size] || 0;
+          const count = safeGet(batch, `eggSizes.${size}`, 0);
           return count > 0;
         });
         if (!hasSelectedSize) return false;
@@ -248,28 +374,28 @@ export default function InventoryPage() {
 
       switch (sortBy) {
         case "date":
-          const dateA = new Date(a.fromDate || 0);
-          const dateB = new Date(b.fromDate || 0);
+          const dateA = new Date(safeGet(a, 'fromDate', 0));
+          const dateB = new Date(safeGet(b, 'fromDate', 0));
           comparison = dateA - dateB;
           break;
         case "totalEggs":
-          comparison = (a.totalEggs || 0) - (b.totalEggs || 0);
+          comparison = safeGet(a, 'totalEggs', 0) - safeGet(b, 'totalEggs', 0);
           break;
         case "defectRate":
           comparison = calculateDefectRate(a) - calculateDefectRate(b);
           break;
         case "batchNumber":
-          comparison = (a.batchNumber || "").localeCompare(b.batchNumber || "");
+          comparison = safeGet(a, 'batchNumber', '').localeCompare(safeGet(b, 'batchNumber', ''));
           break;
         default:
           comparison = 0;
       }
 
       return sortDirection === "desc" ? -comparison : comparison;
-    });
+    }), [batchReviews, searchQuery, dateFrom, dateTo, statusFilter, defectRateThreshold, sizeFilters, sortBy, sortDirection, calculateDefectRate]);
 
-  // Clear all filters
-  const clearFilters = () => {
+  // Clear all filters (memoized)
+  const clearFilters = useCallback(() => {
     setSearchQuery("");
     setDateFrom("");
     setDateTo("");
@@ -277,10 +403,18 @@ export default function InventoryPage() {
     setDefectRateThreshold(0);
     setSizeFilters([]);
     setCurrentPage(1);
-  };
+    
+    // Clear from localStorage
+    try {
+      localStorage.removeItem('inventory-filters');
+      devLog("Inventory: Cleared filters from localStorage");
+    } catch (error) {
+      devError("Inventory: Error clearing filters from localStorage", error);
+    }
+  }, []);
 
-  // Handle batch status toggle
-  const handleStatusToggle = async () => {
+  // Handle batch status toggle (memoized)
+  const handleStatusToggle = useCallback(async () => {
     if (!selectedBatch || !overviewData) return;
 
     try {
@@ -299,14 +433,32 @@ export default function InventoryPage() {
 
         // Refresh the batch list to reflect status change
         const inventoryData = await getMachineLinkedInventoryData();
-        setBatchReviews(inventoryData);
+        const validBatches = inventoryData.filter(isValidBatch);
+        setBatchReviews(validBatches);
+        
+        setResultMessage(`Batch status updated to ${newStatus} successfully!`);
+        await saveInAppNotification(
+          `Batch ${selectedBatch} status changed to ${newStatus}.`,
+          'batch_status_updated'
+        );
+      } else {
+        setResultMessage("Failed to update batch status. Please try again.");
+        await saveInAppNotification(
+          'Could not update batch status. Please try again.',
+          'batch_status_update_failed'
+        );
       }
     } catch (error) {
-      console.error("Error updating batch status:", error);
+      devError("Error updating batch status:", error);
+      setResultMessage("Failed to update batch status. Please try again.");
+      await saveInAppNotification(
+        'An error occurred while updating batch status.',
+        'batch_status_update_failed'
+      );
     } finally {
       setUpdatingStatus(false);
     }
-  };
+  }, [selectedBatch, overviewData]);
 
   // Reset pagination and clear selections when filters change
   useEffect(() => {
@@ -332,29 +484,100 @@ export default function InventoryPage() {
     };
   }, [showExportDropdown]);
 
-  // Handle exports
-  const handleExportBatchList = async (format, batchNumbers = []) => {
+  // Fallback copy method for unsupported browsers
+  const fallbackCopyToClipboard = useCallback((text) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-999999px';
+      textArea.style.top = '-999999px';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (successful) {
+        setResultMessage("Batch URL copied to clipboard!");
+      } else {
+        setResultMessage("Failed to copy URL. Please try manually.");
+      }
+    } catch (error) {
+      devError("Fallback copy failed:", error);
+      setResultMessage("Failed to copy URL. Please try manually.");
+    }
+  }, []);
+
+  // Copy batch URL to clipboard (with proper error handling)
+  const copyBatchUrl = useCallback((batchNumber) => {
+    try {
+      if (typeof window === 'undefined') {
+        setResultMessage("Copy not available in this context.");
+        return;
+      }
+      
+      const baseUrl = window.location.origin;
+      const batchUrl = `${baseUrl}/batch/${encodeURIComponent(batchNumber)}`;
+      
+      // Check if clipboard API is available
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        navigator.clipboard.writeText(batchUrl)
+          .then(() => {
+            setResultMessage("Batch URL copied to clipboard!");
+          })
+          .catch((error) => {
+            devError("Error copying to clipboard:", error);
+            // Fallback to legacy method
+            fallbackCopyToClipboard(batchUrl);
+          });
+      } else {
+        // Fallback for browsers that don't support clipboard API
+        fallbackCopyToClipboard(batchUrl);
+      }
+    } catch (error) {
+      devError("Error in copyBatchUrl:", error);
+      setResultMessage("Failed to copy URL. Please try again.");
+    }
+  }, [fallbackCopyToClipboard]);
+
+  // Handle exports with progress tracking (memoized)
+  const handleExportBatchList = useCallback(async (format, batchNumbers = []) => {
     try {
       setIsExporting(true);
+      
       const batchesToExport = batchNumbers.length > 0
         ? filteredAndSortedBatches.filter((batch) => batchNumbers.includes(batch.batchNumber))
         : filteredAndSortedBatches;
       
       await exportInventoryBatches(batchesToExport, format);
+      
       setShowBatchSelectionModal(false);
       setSelectedBatches([]);
+      setResultMessage(`Batch list exported successfully as ${format.toUpperCase()}!`);
+      await saveInAppNotification(
+        `Successfully exported ${batchesToExport.length} batch${batchesToExport.length !== 1 ? 'es' : ''} as ${format.toUpperCase()}.`,
+        'batch_list_exported'
+      );
     } catch (error) {
-      console.error("Error exporting batch list:", error);
+      devError("Error exporting batch list:", error);
+      setResultMessage("Failed to export batch list. Please try again.");
+      await saveInAppNotification(
+        'Failed to export batch list. Please try again.',
+        'batch_export_failed'
+      );
     } finally {
       setIsExporting(false);
     }
-  };
+  }, [filteredAndSortedBatches]);
 
-  const handleExportBatchDetails = async (format) => {
+  const handleExportBatchDetails = useCallback(async (format) => {
     if (!selectedBatch || !overviewData) return;
 
     try {
       setIsExporting(true);
+      
       if (format === "pdf") {
         await exportBatchDetailsPDF(selectedBatch, overviewData);
       } else if (format === "image") {
@@ -362,24 +585,65 @@ export default function InventoryPage() {
         await new Promise(resolve => setTimeout(resolve, 100));
         await exportBatchOverviewImage("batch-overview-container", selectedBatch);
       }
+      
+      setResultMessage(`Batch details exported successfully as ${format.toUpperCase()}!`);
+      await saveInAppNotification(
+        `Batch ${selectedBatch} details exported successfully as ${format.toUpperCase()}.`,
+        'batch_details_exported'
+      );
     } catch (error) {
-      console.error("Error exporting batch details:", error);
+      devError("Error exporting batch details:", error);
+      setResultMessage("Failed to export batch details. Please try again.");
+      await saveInAppNotification(
+        'Failed to export batch details. Please try again.',
+        'batch_export_failed'
+      );
     } finally {
       setIsExporting(false);
     }
-  };
+  }, [selectedBatch, overviewData]);
 
-  // Pagination calculations (using filtered batches)
-  const totalPages = Math.ceil(filteredAndSortedBatches.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const currentItems = filteredAndSortedBatches.slice(startIndex, endIndex);
+  // Handle batch comparison from selection modal
+  const handleCompareSelected = useCallback(async (selectedBatchNumbers) => {
+    setCompareBatches(selectedBatchNumbers)
+    
+    // Fetch overview data for selected batches
+    for (const batchNumber of selectedBatchNumbers) {
+      if (!comparisonOverviewData[batchNumber]) {
+        try {
+          const data = await getMachineLinkedBatchDetails(batchNumber)
+          setComparisonOverviewData(prevData => ({
+            ...prevData,
+            [batchNumber]: data
+          }))
+        } catch (error) {
+          devError("Error loading batch details for comparison:", error)
+        }
+      }
+    }
+    
+    // Open comparison modal
+    setShowComparisonModal(true)
+  }, [comparisonOverviewData]);
 
-  // Pagination functions
-  const goToFirstPage = () => setCurrentPage(1);
-  const goToPreviousPage = () => setCurrentPage(prev => Math.max(prev - 1, 1));
-  const goToNextPage = () => setCurrentPage(prev => Math.min(prev + 1, totalPages));
-  const goToLastPage = () => setCurrentPage(totalPages);
+  // Pagination calculations (memoized)
+  const { totalPages, currentItems } = useMemo(() => {
+    const total = Math.ceil(filteredAndSortedBatches.length / rowsPerPage);
+    const startIndex = (currentPage - 1) * rowsPerPage;
+    const endIndex = startIndex + rowsPerPage;
+    const items = filteredAndSortedBatches.slice(startIndex, endIndex);
+    
+    return {
+      totalPages: total,
+      currentItems: items
+    };
+  }, [filteredAndSortedBatches, currentPage, rowsPerPage]);
+
+  // Pagination functions (memoized)
+  const goToFirstPage = useCallback(() => setCurrentPage(1), []);
+  const goToPreviousPage = useCallback(() => setCurrentPage(prev => Math.max(prev - 1, 1)), []);
+  const goToNextPage = useCallback(() => setCurrentPage(prev => Math.min(prev + 1, totalPages)), [totalPages]);
+  const goToLastPage = useCallback(() => setCurrentPage(totalPages), [totalPages]);
 
   return (
     <div className="min-h-screen container mx-auto text-[#1F2421] relative">
@@ -545,6 +809,7 @@ export default function InventoryPage() {
                       qrCodeDataUrl={qrCodeDataUrl}
                       qrCodeLoading={qrCodeLoading}
                       downloadQRCode={downloadQRCode}
+                      copyBatchUrl={copyBatchUrl}
                     />
                   </div>
                 </div>
@@ -611,6 +876,64 @@ export default function InventoryPage() {
                     onClearFilters={clearFilters}
                   />
 
+                  {/* Quick Stats Dashboard */}
+                  <div className="space-y-6">
+                    {/* Toggle Insights Button */}
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => setShowInsights(!showInsights)}
+                        className="flex items-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                      >
+                        <TrendingUp className="w-4 h-4" />
+                        {showInsights ? 'Hide' : 'Show'} Analytics & Insights
+                      </button>
+                      
+                      {/* Batch Comparison Button */}
+                      <button
+                        onClick={() => setShowComparisonSelectionModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium"
+                      >
+                        <GitCompare className="w-4 h-4" />
+                        Compare Batches
+                      </button>
+                    </div>
+
+                    {showInsights && (
+                      <>
+                        {/* Stats Cards */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                          <StatCard
+                            title="Total Batches"
+                            value={quickStats.totalBatches}
+                            icon={Package}
+                            color="blue"
+                          />
+                          <StatCard
+                            title="Total Eggs"
+                            value={quickStats.totalEggs}
+                            icon={Egg}
+                            color="purple"
+                          />
+                          <StatCard
+                            title="Avg Defect Rate"
+                            value={`${quickStats.avgDefectRate}%`}
+                            icon={AlertTriangle}
+                            color="red"
+                          />
+                          <StatCard
+                            title="Active Batches"
+                            value={quickStats.activeBatches}
+                            icon={CheckCircle}
+                            color="green"
+                          />
+                        </div>
+
+                        {/* Trends Charts */}
+                        <TrendsChart batches={filteredAndSortedBatches} />
+                      </>
+                    )}
+                  </div>
+
                   {/* Batch Grid */}
                   <InventoryBatchGrid 
                     loading={loading}
@@ -624,7 +947,8 @@ export default function InventoryPage() {
 
               {/* Pagination - Only show when no batch is selected */}
               {!selectedBatch && (
-                <InventoryPagination 
+                <div className="mt-6">
+                  <InventoryPagination 
                   loading={loading}
                   batchReviews={filteredAndSortedBatches}
                   currentPage={currentPage}
@@ -639,6 +963,7 @@ export default function InventoryPage() {
                   goToNextPage={goToNextPage}
                   goToLastPage={goToLastPage}
                 />
+                </div>
               )}
             </div>
           </div>
@@ -659,6 +984,31 @@ export default function InventoryPage() {
           isExporting={isExporting}
         />
       )}
+
+      {/* Batch Comparison Modal */}
+      {showComparisonModal && (
+        <BatchComparisonModal
+          batches={filteredAndSortedBatches}
+          selectedBatches={compareBatches}
+          onClose={() => setShowComparisonModal(false)}
+          overviewDataMap={comparisonOverviewData}
+        />
+      )}
+
+      {/* Batch Comparison Selection Modal */}
+      {showComparisonSelectionModal && (
+        <BatchComparisonSelectionModal
+          batches={filteredAndSortedBatches}
+          onClose={() => setShowComparisonSelectionModal(false)}
+          onCompare={handleCompareSelected}
+        />
+      )}
+
+      {/* Result Modal for Success/Error Feedback */}
+      <ResultModal
+        message={resultMessage}
+        onClose={() => setResultMessage("")}
+      />
     </div>
   );
 }

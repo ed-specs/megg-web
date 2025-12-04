@@ -1336,136 +1336,206 @@ const exportInventoryBatchesPDF = async (batches, filename) => {
   const activeBatches = batches.filter(b => (b.status || 'active').toLowerCase() === 'active').length;
   const avgDefectRate = totalEggs > 0 ? ((totalDefects / totalEggs) * 100).toFixed(2) : '0.00';
 
-  // --- COVER PAGE ---
-  let y = 20;
-  const logoSize = 50;
-  const startX = (pageWidth - logoSize) / 2;
+  // --- HEADER (Content-Centric) ---
+  let y = 15;
+  const logoSize = 20; // Small logo
+  const marginLeft = 15;
   
-  doc.addImage(meggLogo, 'PNG', startX, y, logoSize, logoSize);
-  y += logoSize + 15;
+  // Logo at top left
+  doc.addImage(meggLogo, 'PNG', marginLeft, y, logoSize, logoSize);
   
-  doc.setFontSize(24);
+  // Title next to logo
+  doc.setFontSize(18);
   doc.setFont(undefined, 'bold');
-  doc.setTextColor(30, 60, 120);
-  doc.text('Inventory Batches Report', pageWidth / 2, y, { align: 'center' });
+  doc.setTextColor(16, 85, 136); // MEGG Blue
+  doc.text('Inventory Batches Report', marginLeft + logoSize + 8, y + 7);
+  
+  // Farm info on the right side
+  if (farmInfo.farmName || farmInfo.farmAddress) {
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(80, 80, 80);
+    let rightY = y + 4;
+    if (farmInfo.farmName) {
+      doc.text(farmInfo.farmName, pageWidth - marginLeft, rightY, { align: 'right' });
+      rightY += 5;
+    }
+    if (farmInfo.farmAddress) {
+      doc.text(farmInfo.farmAddress, pageWidth - marginLeft, rightY, { align: 'right' });
+    }
+  }
+  
+  y += logoSize + 8;
+  
+  // Horizontal line
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(marginLeft, y, pageWidth - marginLeft, y);
   y += 10;
   
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.5);
-  doc.line(30, y, pageWidth - 30, y);
+  // Generation date - small and on the right
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Generated: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`, pageWidth - marginLeft, y, { align: 'right' });
   y += 12;
-  
+
+  // --- SUMMARY SECTION ---
   doc.setFontSize(12);
-  doc.setFont(undefined, 'normal');
-  doc.setTextColor(0, 0, 0);
-  if (farmInfo.farmName) {
-    doc.text(farmInfo.farmName, pageWidth / 2, y, { align: 'center' });
-    y += 7;
-  }
-  if (farmInfo.farmAddress) {
-    doc.text(farmInfo.farmAddress, pageWidth / 2, y, { align: 'center' });
-    y += 7;
-  }
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136);
+  doc.text('Summary', marginLeft, y);
   y += 8;
   
-  doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Generated on: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`, pageWidth / 2, y, { align: 'center' });
-  y += 20;
-
-  // Summary Box
-  doc.setFillColor(240, 248, 255);
-  doc.roundedRect(25, y, pageWidth - 50, 50, 5, 5, 'F');
-  doc.setDrawColor(200, 220, 240);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(25, y, pageWidth - 50, 50, 5, 5);
-  
-  doc.setFontSize(14);
-  doc.setFont(undefined, 'bold');
-  doc.setTextColor(30, 60, 120);
-  doc.text('Summary', pageWidth / 2, y + 10, { align: 'center' });
+  // Clean layout - 3 columns for better use of landscape space
+  const col1 = marginLeft + 5;
+  const col2 = pageWidth / 3 + 10;
+  const col3 = (pageWidth / 3) * 2 + 10;
   
   doc.setFontSize(10);
   doc.setFont(undefined, 'normal');
-  doc.setTextColor(0, 0, 0);
-  const summaryY = y + 20;
-  const summaryLeft = 35;
-  const summaryRight = pageWidth / 2 + 20;
+  doc.setTextColor(60, 60, 60);
   
-  doc.text(`Total Batches: ${totalBatches}`, summaryLeft, summaryY);
-  doc.text(`Active Batches: ${activeBatches}`, summaryRight, summaryY);
-  doc.text(`Total Eggs: ${totalEggs.toLocaleString()}`, summaryLeft, summaryY + 8);
-  doc.text(`Total Good Eggs: ${totalGood.toLocaleString()}`, summaryRight, summaryY + 8);
-  doc.text(`Total Defects: ${totalDefects.toLocaleString()}`, summaryLeft, summaryY + 16);
-  doc.text(`Average Defect Rate: ${avgDefectRate}%`, summaryRight, summaryY + 16);
+  // Column 1
+  doc.text('Total Batches:', col1, y);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(totalBatches.toString(), col1 + 45, y);
+  
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Active Batches:', col1, y + 7);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(activeBatches.toString(), col1 + 45, y + 7);
+  
+  // Column 2
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Total Eggs:', col2, y);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(totalEggs.toLocaleString(), col2 + 40, y);
+  
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Good Eggs:', col2, y + 7);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(34, 197, 94); // Green
+  doc.text(totalGood.toLocaleString(), col2 + 40, y + 7);
+  
+  // Column 3
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Total Defects:', col3, y);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(239, 68, 68); // Red
+  doc.text(totalDefects.toLocaleString(), col3 + 40, y);
+  
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Avg Defect Rate:', col3, y + 7);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(`${avgDefectRate}%`, col3 + 40, y + 7);
   
   addFooter(doc, pageWidth, pageHeight);
   doc.addPage();
 
   // --- TABLE PAGE ---
   function addTableHeader(doc, pageWidth) {
-    const logoSize = 15;
-    const startX = (pageWidth - logoSize) / 2;
+    const headerMargin = 10;
+    const smallLogoSize = 15;
     let y = 8;
     
-    doc.addImage(meggLogo, 'PNG', startX, y, logoSize, logoSize);
-    y += logoSize + 3;
+    // Small logo at top left
+    doc.addImage(meggLogo, 'PNG', headerMargin, y, smallLogoSize, smallLogoSize);
     
+    // Title next to logo
     doc.setFontSize(11);
     doc.setFont(undefined, 'bold');
-    doc.setTextColor(30, 60, 120);
-    doc.text('Inventory Batches Report', pageWidth / 2, y, { align: 'center' });
-    y += 3;
+    doc.setTextColor(16, 85, 136);
+    doc.text('Inventory Batches Report', headerMargin + smallLogoSize + 5, y + 6);
     
-    doc.setDrawColor(180, 180, 180);
-    doc.setLineWidth(0.3);
-    doc.line(15, y, pageWidth - 15, y);
+    y += smallLogoSize + 3;
+    
+    // Thin separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.line(headerMargin, y, pageWidth - headerMargin, y);
     return y + 5;
   }
 
-  // Table columns with widths optimized for landscape
+  // Table columns - Optimized widths to fit landscape page (297mm ~ 297 points)
+  // Total available width: ~275 points (297 - 22 for margins)
   const columns = [
-    { key: 'batchNumber', header: 'Batch Number', width: 35, align: 'left' },
-    { key: 'totalEggs', header: 'Total Eggs', width: 25, align: 'right' },
-    { key: 'totalSort', header: 'Good Eggs', width: 25, align: 'right' },
-    { key: 'defectEggs', header: 'Defect Eggs', width: 25, align: 'right' },
-    { key: 'defectRate', header: 'Defect %', width: 20, align: 'right' },
-    { key: 'smallEggs', header: 'Small', width: 20, align: 'right' },
-    { key: 'mediumEggs', header: 'Medium', width: 20, align: 'right' },
-    { key: 'largeEggs', header: 'Large', width: 20, align: 'right' },
-    { key: 'status', header: 'Status', width: 25, align: 'center' },
-    { key: 'fromDate', header: 'From Date', width: 40, align: 'left' },
-    { key: 'toDate', header: 'To Date', width: 40, align: 'left' },
+    { key: 'batchNumber', header: 'Batch Number', width: 42, align: 'left' },
+    { key: 'totalEggs', header: 'Total', width: 20, align: 'right' },
+    { key: 'totalSort', header: 'Good', width: 20, align: 'right' },
+    { key: 'defectEggs', header: 'Defect', width: 20, align: 'right' },
+    { key: 'defectRate', header: 'Def %', width: 18, align: 'right' },
+    { key: 'smallEggs', header: 'Small', width: 17, align: 'right' },
+    { key: 'mediumEggs', header: 'Medium', width: 19, align: 'right' },
+    { key: 'largeEggs', header: 'Large', width: 17, align: 'right' },
+    { key: 'status', header: 'Status', width: 24, align: 'center' },
+    { key: 'fromDate', header: 'From Date', width: 38, align: 'left' },
+    { key: 'toDate', header: 'To Date', width: 38, align: 'left' },
   ];
+  // Total width: 273 points (fits in 275 available)
 
-  const tableStartX = 10;
+  const tableStartX = 12;
+  const headerHeight = 10; // Taller header row
   const rowHeight = 8;
-  const fontSize = 8;
+  const fontSize = 7.5; // Data row font size
+  const headerFontSize = 8; // Header row font size
   let yPosition = addTableHeader(doc, pageWidth) + 5;
 
-  // Table header
+  // Section title
+  doc.setFontSize(12);
   doc.setFont(undefined, 'bold');
-  doc.setFontSize(fontSize);
+  doc.setTextColor(16, 85, 136);
+  doc.text('Batch Details', 15, yPosition);
+  yPosition += 10;
+
+  // Table header row
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(headerFontSize);
   doc.setTextColor(255, 255, 255);
-  doc.setFillColor(30, 60, 120);
+  doc.setFillColor(16, 85, 136); // MEGG Blue
   doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
+  doc.setLineWidth(0.2);
   
   let x = tableStartX;
+  
+  // Draw all header backgrounds first
   columns.forEach((col) => {
-    doc.rect(x, yPosition, col.width, rowHeight, 'F');
-    doc.rect(x, yPosition, col.width, rowHeight);
-    doc.text(col.header, x + (col.align === 'right' ? col.width - 3 : col.align === 'center' ? col.width / 2 : 3), 
-             yPosition + rowHeight / 2 + 1, { 
-               align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
-               baseline: 'middle' 
-             });
+    doc.setFillColor(16, 85, 136); // MEGG Blue for all headers
+    doc.rect(x, yPosition, col.width, headerHeight, 'F');
     x += col.width;
   });
-  yPosition += rowHeight;
+  
+  // Draw borders and text
+  x = tableStartX;
+  doc.setTextColor(255, 255, 255); // White text for all headers
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(headerFontSize);
+  
+  columns.forEach((col) => {
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(x, yPosition, col.width, headerHeight);
+    
+    const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+    doc.text(col.header, textX, yPosition + headerHeight / 2 + 1, { 
+      align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+      baseline: 'middle',
+      maxWidth: col.width - 6
+    });
+    x += col.width;
+  });
+  yPosition += headerHeight;
 
-  // Table rows
+  // Table data rows
   doc.setFont(undefined, 'normal');
+  doc.setFontSize(fontSize);
   doc.setTextColor(0, 0, 0);
   
   batches.forEach((batch, rowIdx) => {
@@ -1474,24 +1544,37 @@ const exportInventoryBatchesPDF = async (batches, filename) => {
       doc.addPage();
       yPosition = addTableHeader(doc, pageWidth) + 5;
       
-      // Redraw header
-      doc.setFont(undefined, 'bold');
-      doc.setFontSize(fontSize);
-      doc.setTextColor(255, 255, 255);
-      doc.setFillColor(30, 60, 120);
+      // Redraw header on new page
       x = tableStartX;
+      
+      // Draw all header backgrounds first
       columns.forEach((col) => {
-        doc.rect(x, yPosition, col.width, rowHeight, 'F');
-        doc.rect(x, yPosition, col.width, rowHeight);
-        doc.text(col.header, x + (col.align === 'right' ? col.width - 3 : col.align === 'center' ? col.width / 2 : 3), 
-                 yPosition + rowHeight / 2 + 1, { 
-                   align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
-                   baseline: 'middle' 
-                 });
+        doc.setFillColor(16, 85, 136); // MEGG Blue for all headers
+        doc.rect(x, yPosition, col.width, headerHeight, 'F');
         x += col.width;
       });
-      yPosition += rowHeight;
+      
+      // Draw borders and text
+      x = tableStartX;
+      doc.setTextColor(255, 255, 255); // White text
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(headerFontSize);
+      
+      columns.forEach((col) => {
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(x, yPosition, col.width, headerHeight);
+        
+        const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+        doc.text(col.header, textX, yPosition + headerHeight / 2 + 1, { 
+          align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+          baseline: 'middle',
+          maxWidth: col.width - 6
+        });
+        x += col.width;
+      });
+      yPosition += headerHeight;
       doc.setFont(undefined, 'normal');
+      doc.setFontSize(fontSize);
       doc.setTextColor(0, 0, 0);
     }
 
@@ -1521,32 +1604,59 @@ const exportInventoryBatchesPDF = async (batches, filename) => {
       else if (col.key === 'mediumEggs') value = (batch.eggSizes?.Medium || 0).toLocaleString();
       else if (col.key === 'largeEggs') value = (batch.eggSizes?.Large || 0).toLocaleString();
       else if (col.key === 'status') value = (batch.status || 'active').toLowerCase() === 'active' ? 'Active' : 'Not Active';
-      else if (col.key === 'fromDate') value = batch.fromDate || 'N/A';
-      else if (col.key === 'toDate') value = batch.toDate || 'N/A';
+      else if (col.key === 'fromDate') {
+        // Format date to be compact (MM/DD/YYYY only, no time)
+        value = batch.fromDate ? new Date(batch.fromDate).toLocaleDateString('en-US') : 'N/A';
+      }
+      else if (col.key === 'toDate') {
+        // Format date to be compact (MM/DD/YYYY only, no time)
+        value = batch.toDate ? new Date(batch.toDate).toLocaleDateString('en-US') : 'N/A';
+      }
 
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.2);
       doc.rect(x, yPosition, col.width, rowHeight);
       
+      // Truncate text if too long to prevent overflow
+      const maxWidth = col.width - 6;
+      let displayValue = value;
+      
+      // For batch numbers, ensure they fit
+      if (col.key === 'batchNumber' && value.length > 20) {
+        displayValue = value.substring(0, 18) + '..';
+      }
+      
       const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
-      doc.text(value, textX, yPosition + rowHeight / 2 + 1, { 
+      doc.text(displayValue, textX, yPosition + rowHeight / 2 + 1, { 
         align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
         baseline: 'middle',
-        maxWidth: col.width - 6
+        maxWidth: maxWidth
       });
       x += col.width;
     });
     yPosition += rowHeight;
   });
 
-  // Summary row
+  // Summary row (TOTALS)
   yPosition += 2;
   x = tableStartX;
-  doc.setFont(undefined, 'bold');
-  doc.setFillColor(230, 240, 255);
-  columns.forEach((col, colIdx) => {
+  
+  // Draw all backgrounds first
+  columns.forEach((col) => {
+    doc.setFillColor(230, 240, 255); // Light blue background
     doc.rect(x, yPosition, col.width, rowHeight, 'F');
-    doc.setDrawColor(200, 200, 200);
+    x += col.width;
+  });
+  
+  // Draw borders and text
+  x = tableStartX;
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(fontSize);
+  doc.setTextColor(0, 0, 0); // Black text for totals
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.2);
+  
+  columns.forEach((col, colIdx) => {
     doc.rect(x, yPosition, col.width, rowHeight);
     
     let summaryValue = '';
@@ -1570,7 +1680,8 @@ const exportInventoryBatchesPDF = async (batches, filename) => {
       const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
       doc.text(summaryValue, textX, yPosition + rowHeight / 2 + 1, { 
         align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
-        baseline: 'middle' 
+        baseline: 'middle',
+        maxWidth: col.width - 6
       });
     }
     x += col.width;
@@ -1604,157 +1715,179 @@ export const exportBatchDetailsPDF = async (batchNumber, overviewData) => {
   const defectRate = totalEggs > 0 ? ((defectEggs / totalEggs) * 100).toFixed(2) : '0.00';
   const status = (overviewData.status || 'active').toLowerCase() === 'active' ? 'Active' : 'Not Active';
 
-  // --- COVER PAGE ---
-  let y = 20;
-  const logoSize = 50;
-  const startX = (pageWidth - logoSize) / 2;
+  // --- HEADER (Content-Centric) ---
+  let y = 15;
+  const logoSize = 20; // Smaller logo
+  const marginLeft = 15;
   
-  doc.addImage(meggLogo, 'PNG', startX, y, logoSize, logoSize);
-  y += logoSize + 18;
+  // Logo at top left
+  doc.addImage(meggLogo, 'PNG', marginLeft, y, logoSize, logoSize);
   
-  doc.setFontSize(22);
+  // Title next to logo
+  doc.setFontSize(18);
   doc.setFont(undefined, 'bold');
-  doc.setTextColor(30, 60, 120);
-  doc.text('Batch Details Report', pageWidth / 2, y, { align: 'center' });
-  y += 12;
+  doc.setTextColor(16, 85, 136); // MEGG Blue
+  doc.text('Batch Details Report', marginLeft + logoSize + 8, y + 7);
   
-  doc.setDrawColor(180, 180, 180);
-  doc.setLineWidth(0.5);
-  doc.line(30, y, pageWidth - 30, y);
-  y += 12;
+  // Farm info on the right side
+  if (farmInfo.farmName || farmInfo.farmAddress) {
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(80, 80, 80);
+    let rightY = y + 4;
+    if (farmInfo.farmName) {
+      doc.text(farmInfo.farmName, pageWidth - marginLeft, rightY, { align: 'right' });
+      rightY += 5;
+    }
+    if (farmInfo.farmAddress) {
+      doc.text(farmInfo.farmAddress, pageWidth - marginLeft, rightY, { align: 'right' });
+    }
+  }
   
-  doc.setFontSize(11);
-  doc.setFont(undefined, 'normal');
-  doc.setTextColor(0, 0, 0);
-  if (farmInfo.farmName) {
-    doc.text(farmInfo.farmName, pageWidth / 2, y, { align: 'center' });
-    y += 7;
-  }
-  if (farmInfo.farmAddress) {
-    doc.text(farmInfo.farmAddress, pageWidth / 2, y, { align: 'center' });
-    y += 7;
-  }
-  y += 11;
+  y += logoSize + 8;
+  
+  // Horizontal line
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(marginLeft, y, pageWidth - marginLeft, y);
+  y += 10;
+  
+  // Generation date - small and on the right
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Generated: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`, pageWidth - marginLeft, y, { align: 'right' });
+  y += 10;
+
+  // Batch Number - Simple and Clean
+  doc.setFontSize(14);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136); // MEGG Blue
+  doc.text(`Batch Number: ${batchNumber || 'Unknown'}`, marginLeft, y);
+  y += 12;
+
+  // --- SUMMARY SECTION ---
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136);
+  doc.text('Summary', marginLeft, y);
+  y += 8;
+  
+  // Clean table layout
+  const leftCol = marginLeft + 5;
+  const valueCol = 75;
+  const rightCol = pageWidth / 2 + 10;
+  const rightValueCol = pageWidth / 2 + 75;
   
   doc.setFontSize(10);
-  doc.setTextColor(100, 100, 100);
-  doc.text(`Generated on: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`, pageWidth / 2, y, { align: 'center' });
-  y += 20;
-
-  // Batch Number Highlight Box
-  doc.setFillColor(30, 60, 120);
-  doc.roundedRect(40, y, pageWidth - 80, 20, 5, 5, 'F');
-  doc.setFontSize(16);
-  doc.setFont(undefined, 'bold');
-  doc.setTextColor(255, 255, 255);
-  doc.text(`Batch: ${batchNumber || 'Unknown'}`, pageWidth / 2, y + 12, { align: 'center' });
-  y += 30;
-
-  // Main Metrics Box
-  doc.setFillColor(245, 250, 255);
-  doc.roundedRect(25, y, pageWidth - 50, 80, 5, 5, 'F');
-  doc.setDrawColor(200, 220, 240);
-  doc.setLineWidth(0.5);
-  doc.roundedRect(25, y, pageWidth - 50, 80, 5, 5);
-  
-  const metricsY = y + 15;
-  const leftCol = 35;
-  const rightCol = pageWidth / 2 + 10;
-  
-  // Left column
-  doc.setFontSize(11);
-  doc.setFont(undefined, 'bold');
-  doc.setTextColor(30, 60, 120);
-  doc.text('Total Eggs:', leftCol, metricsY);
   doc.setFont(undefined, 'normal');
-  doc.setTextColor(0, 0, 0);
-  doc.text(totalEggs.toLocaleString(), leftCol + 50, metricsY);
+  doc.setTextColor(60, 60, 60);
   
+  // Left column - Main metrics
+  doc.text('Total Eggs:', leftCol, y);
   doc.setFont(undefined, 'bold');
-  doc.setTextColor(30, 60, 120);
-  doc.text('Good Eggs:', leftCol, metricsY + 12);
-  doc.setFont(undefined, 'normal');
   doc.setTextColor(0, 0, 0);
-  doc.text(goodEggs.toLocaleString(), leftCol + 50, metricsY + 12);
+  doc.text(totalEggs.toLocaleString(), valueCol, y);
   
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Good Eggs:', leftCol, y + 7);
   doc.setFont(undefined, 'bold');
-  doc.setTextColor(30, 60, 120);
-  doc.text('Defect Eggs:', leftCol, metricsY + 24);
-  doc.setFont(undefined, 'normal');
-  doc.setTextColor(0, 0, 0);
-  doc.text(defectEggs.toLocaleString(), leftCol + 50, metricsY + 24);
+  doc.setTextColor(34, 197, 94); // Green
+  doc.text(goodEggs.toLocaleString(), valueCol, y + 7);
   
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Defect Eggs:', leftCol, y + 14);
   doc.setFont(undefined, 'bold');
-  doc.setTextColor(30, 60, 120);
-  doc.text('Defect Rate:', leftCol, metricsY + 36);
-  doc.setFont(undefined, 'normal');
-  doc.setTextColor(0, 0, 0);
-  doc.text(`${defectRate}%`, leftCol + 50, metricsY + 36);
+  doc.setTextColor(239, 68, 68); // Red
+  doc.text(defectEggs.toLocaleString(), valueCol, y + 14);
   
-  // Right column
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Defect Rate:', leftCol, y + 21);
   doc.setFont(undefined, 'bold');
-  doc.setTextColor(30, 60, 120);
-  doc.text('Status:', rightCol, metricsY);
-  doc.setFont(undefined, 'normal');
   doc.setTextColor(0, 0, 0);
-  doc.text(status, rightCol + 35, metricsY);
+  doc.text(`${defectRate}%`, valueCol, y + 21);
   
+  // Time Range in left column (has more space)
   if (overviewData.timeRange) {
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(30, 60, 120);
-    doc.text('Time Range:', rightCol, metricsY + 12);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.text('Time Range:', leftCol, y + 28);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
     const timeRange = String(overviewData.timeRange);
-    const timeRangeLines = doc.splitTextToSize(timeRange, 80);
-    doc.text(timeRangeLines, rightCol + 35, metricsY + 12);
+    doc.text(timeRange, valueCol, y + 28);
   }
+  
+  // Right column - Metadata
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Status:', rightCol, y);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(status, rightValueCol, y);
   
   if (overviewData.createdAt) {
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(30, 60, 120);
-    doc.text('Created At:', rightCol, metricsY + 24);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.text('Created:', rightCol, y + 7);
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
-    const createdAt = new Date(overviewData.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Manila' });
-    doc.text(createdAt, rightCol + 35, metricsY + 24);
+    const createdAt = new Date(overviewData.createdAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' });
+    doc.text(createdAt, rightValueCol, y + 7);
   }
   
-  y += 95;
+  y += 38;
 
-  // Size Breakdown Section
+  // --- SIZE BREAKDOWN SECTION ---
   if (overviewData.sizeBreakdown && Object.keys(overviewData.sizeBreakdown).length > 0) {
-    doc.setFontSize(13);
+    doc.setFontSize(12);
     doc.setFont(undefined, 'bold');
-    doc.setTextColor(30, 60, 120);
-    doc.text('Size Breakdown', pageWidth / 2, y, { align: 'center' });
-    y += 12;
+    doc.setTextColor(16, 85, 136);
+    doc.text('Size Breakdown', marginLeft, y);
+    y += 8;
     
-    doc.setFillColor(250, 252, 255);
-    doc.roundedRect(30, y, pageWidth - 60, 10 + Object.keys(overviewData.sizeBreakdown).length * 12, 5, 5, 'F');
-    doc.setDrawColor(200, 220, 240);
-    doc.setLineWidth(0.3);
-    doc.roundedRect(30, y, pageWidth - 60, 10 + Object.keys(overviewData.sizeBreakdown).length * 12, 5, 5);
+    // Simple clean table with borders
+    const tableStartY = y;
+    const rowHeight = 8;
+    const col1 = marginLeft + 5;
+    const col2 = marginLeft + 60;
+    const col3 = marginLeft + 110;
+    const tableWidth = pageWidth - (marginLeft * 2);
     
     // Table header
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.setTextColor(30, 60, 120);
-    doc.text('Size', 40, y + 8);
-    doc.text('Count', pageWidth / 2 - 20, y + 8);
-    doc.text('Percentage', pageWidth - 50, y + 8, { align: 'right' });
-    y += 12;
+    doc.setFillColor(245, 245, 245);
+    doc.rect(marginLeft, tableStartY, tableWidth, rowHeight, 'F');
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.rect(marginLeft, tableStartY, tableWidth, rowHeight);
     
-    // Size rows
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(60, 60, 60);
+    doc.text('Size', col1, tableStartY + 5.5);
+    doc.text('Count', col2, tableStartY + 5.5);
+    doc.text('Percentage', col3, tableStartY + 5.5);
+    y += rowHeight;
+    
+    // Table rows
     doc.setFont(undefined, 'normal');
     doc.setTextColor(0, 0, 0);
     Object.entries(overviewData.sizeBreakdown).forEach(([size, count]) => {
-      const percentage = totalEggs > 0 ? ((count || 0) / totalEggs * 100).toFixed(2) : '0.00';
-      doc.text(size, 40, y + 6);
-      doc.text((count || 0).toLocaleString(), pageWidth / 2 - 20, y + 6);
-      doc.text(`${percentage}%`, pageWidth - 50, y + 6, { align: 'right' });
-      y += 12;
+      const percentage = totalEggs > 0 ? ((count || 0) / totalEggs * 100).toFixed(1) : '0.0';
+      
+      // Draw row border
+      doc.setDrawColor(220, 220, 220);
+      doc.rect(marginLeft, y, tableWidth, rowHeight);
+      
+      doc.text(size, col1, y + 5.5);
+      doc.text((count || 0).toLocaleString(), col2, y + 5.5);
+      doc.text(`${percentage}%`, col3, y + 5.5);
+      y += rowHeight;
     });
+    
+    y += 5;
   }
 
   addFooter(doc, pageWidth, pageHeight);

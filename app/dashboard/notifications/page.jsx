@@ -5,7 +5,7 @@ import { Navbar } from "../components/NavBar";
 import { Header } from "../components/Header";
 import { getUserNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from "../../lib/notifications/NotificationsService";
 import { getUserAccountId } from "../../utils/auth-utils";
-import { Bell, BellOff, Check, Trash, CheckCheck, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings } from "lucide-react";
+import { Bell, BellOff, Check, Trash, CheckCheck, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, AlertTriangle, RefreshCw, Filter } from "lucide-react";
 import Image from "next/image";
 import LoadingLogo from "../components/LoadingLogo";
 import { useLoadingDelay } from "../components/useLoadingDelay";
@@ -22,6 +22,7 @@ export default function NotificationPage() {
         const accountId = getUserAccountId();
         if (accountId) {
           const userNotifications = await getUserNotifications(accountId, 100); // Get up to 100 notifications
+          console.log("📥 Loaded notifications:", userNotifications);
           setNotifications(userNotifications);
         }
       } catch (error) {
@@ -157,7 +158,18 @@ export default function NotificationPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {notifications.map((notification) => (
+                {notifications.map((notification) => {
+                  // Debug log for each notification
+                  console.log(`📋 Rendering notification ${notification.id.substring(0, 20)}...`, {
+                    type: notification.type,
+                    icon: notification.icon,
+                    profileImage: notification.profileImage,
+                    willShowDownloadIcon: (notification.icon === "download" || 
+                                           notification.type === "batch_list_exported" || 
+                                           notification.type === "batch_details_exported")
+                  });
+                  
+                  return (
                   <div
                     key={notification.id}
                     className={`p-4 rounded-xl border transition-colors duration-200 ${
@@ -167,8 +179,30 @@ export default function NotificationPage() {
                     }`}
                   >
                     <div className="flex items-start gap-4">
-                      <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200 flex-shrink-0">
-                        {notification.icon === "login" ? (
+                      {/* Icon Display */}
+                      <div className="relative flex-shrink-0">
+                        {/* Export notifications - Download icon */}
+                        {(notification.icon === "download" || 
+                          notification.type === "batch_list_exported" || 
+                          notification.type === "batch_details_exported") ? (
+                          <div className="w-12 h-12 bg-green-500 flex items-center justify-center rounded-full">
+                            <Download className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                        /* Error/Alert notifications - Alert icon */
+                        ) : (notification.icon === "alert" || 
+                               notification.type === "batch_export_failed" ||
+                               notification.type === "batch_status_update_failed" ||
+                               notification.type === "inventory_refresh_failed" ||
+                               notification.type === "inventory_load_failed") ? (
+                          <div className="w-12 h-12 bg-red-500 flex items-center justify-center rounded-full">
+                            <AlertTriangle className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                        /* Status update - Check icon */
+                        ) : (notification.icon === "check" || notification.type === "batch_status_updated") ? (
+                          <div className="w-12 h-12 bg-emerald-500 flex items-center justify-center rounded-full">
+                            <Check className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                        ) : notification.icon === "login" ? (
                           <div className="w-12 h-12 bg-[#105588] flex items-center justify-center rounded-full">
                             <LogIn className="w-5 h-5 text-white" strokeWidth={2.5} />
                           </div>
@@ -208,13 +242,27 @@ export default function NotificationPage() {
                           <div className="w-12 h-12 bg-gray-500 flex items-center justify-center rounded-full">
                             <Settings className="w-5 h-5 text-white" strokeWidth={2.5} />
                           </div>
+                        ) : notification.icon === "refresh" ? (
+                          <div className="w-12 h-12 bg-blue-500 flex items-center justify-center rounded-full">
+                            <RefreshCw className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                        ) : notification.icon === "filter" ? (
+                          <div className="w-12 h-12 bg-yellow-500 flex items-center justify-center rounded-full">
+                            <Filter className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                        ) : notification.profileImage ? (
+                          <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
+                            <Image
+                              src={notification.profileImage}
+                              alt="Profile"
+                              fill
+                              className="object-cover"
+                            />
+                          </div>
                         ) : (
-                          <Image
-                            src={notification.profileImage || "/default.png"}
-                            alt="Profile"
-                            fill
-                            className="object-cover"
-                          />
+                          <div className="w-12 h-12 bg-gray-400 flex items-center justify-center rounded-full">
+                            <Bell className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -243,7 +291,8 @@ export default function NotificationPage() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
