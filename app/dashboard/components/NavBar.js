@@ -198,7 +198,7 @@ export function Navbar() {
   const menus = [
     { name: "Dashboard", href: "/dashboard/overview", icon: LayoutDashboard },
     { name: "Inventory", href: "/dashboard/inventory", icon: Package },
-    { name: "Kiosks", href: "/dashboard/kiosks", icon: MonitorDot, badge: kioskSession ? "1 Kiosk Connected" : null },
+    { name: "Kiosk", href: "/dashboard/kiosks", icon: MonitorDot, badge: kioskSession ? "Connected" : null },
   ];
 
   const historyLinks = [

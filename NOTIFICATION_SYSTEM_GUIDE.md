@@ -133,6 +133,14 @@ await saveInAppNotification(
 |------|-------------|------|-------|
 | `settings_change` | Settings updated | settings | Gray |
 
+### Kiosk Sessions
+| Type | Description | Icon | Color |
+|------|-------------|------|-------|
+| `kiosk_connected` | Kiosk logged in | monitor | Blue (#105588) |
+| `kiosk_disconnected` | Kiosk logged out | monitor | Gray |
+| `kiosk_session_timeout` | Session timed out | alert | Red |
+| `kiosk_network_recovered` | Network restored | wifi | Green |
+
 ---
 
 ## Icon Mapping

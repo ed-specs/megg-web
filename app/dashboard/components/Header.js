@@ -1,5 +1,5 @@
 "use client";
-import { Bell, Menu, Trash2, X, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, Check, AlertTriangle, RefreshCw, Filter, Shield } from "lucide-react";
+import { Bell, Menu, Trash2, X, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, Check, AlertTriangle, RefreshCw, Filter, Shield, MonitorDot, Wifi } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -221,6 +221,7 @@ export  function Header({ setSidebarOpen }) {
       "/dashboard/history/sort": "Sort History",
       "/dashboard/history/defect": "Defect History",
       "/dashboard/profile": "Profile",
+      "/dashboard/kiosks": "Kiosks",
       "/dashboard/settings/edit-profile": "Edit Profile",
       "/dashboard/settings/change-password": "Change Password",
       "/dashboard/settings/security": "Security",
@@ -429,6 +430,18 @@ export  function Header({ setSidebarOpen }) {
                               ) : (notif.icon === "shield" || notif.type === "security_session_revoked") ? (
                                 <div className="w-12 h-12 bg-red-600 flex items-center justify-center rounded-full">
                                   <Shield className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : (notif.icon === "monitor" && notif.type === "kiosk_connected") ? (
+                                <div className="w-12 h-12 bg-blue-600 flex items-center justify-center rounded-full">
+                                  <MonitorDot className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : (notif.icon === "monitor" && notif.type === "kiosk_disconnected") ? (
+                                <div className="w-12 h-12 bg-gray-600 flex items-center justify-center rounded-full">
+                                  <MonitorDot className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
+                              ) : notif.icon === "wifi" ? (
+                                <div className="w-12 h-12 bg-green-600 flex items-center justify-center rounded-full">
+                                  <Wifi className="w-5 h-5 text-white" strokeWidth={2.5} />
                                 </div>
                               ) : notif.profileImage ? (
                                 <Image

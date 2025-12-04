@@ -33,7 +33,7 @@ function generateNotificationId(accountId) {
 // Check if notifications are enabled before creating
 async function checkNotificationSettings(userId, type) {
   try {
-    // Always allow login, logout, password, settings, and profile-related notifications
+    // Always allow login, logout, password, settings, kiosk, and profile-related notifications
     if (type === "login" || 
         type === "logout" ||
         type === "password_change" ||
@@ -42,6 +42,7 @@ async function checkNotificationSettings(userId, type) {
         type.includes("password") ||
         type.includes("settings") ||
         type.includes("security") ||
+        type.includes("kiosk") ||
         type.includes("profile") || 
         type.includes("name_updated") || 
         type.includes("email_updated") || 
@@ -202,6 +203,11 @@ export async function createNotification(accountId, message, type, read = false)
       "security_session_revoked": "shield",
       // Farm notifications
       "farm_primary_changed": "building",
+      // Kiosk notifications
+      "kiosk_connected": "monitor",
+      "kiosk_disconnected": "monitor",
+      "kiosk_session_timeout": "alert",
+      "kiosk_network_recovered": "wifi",
     }
 
     // Check if this notification type should use an icon

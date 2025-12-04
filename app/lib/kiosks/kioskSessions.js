@@ -35,13 +35,17 @@ export function listenToActiveKioskSessions(callback) {
       
       callback(sessions);
     }, (error) => {
-      console.error("Error listening to active kiosk sessions:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error listening to active kiosk sessions:", error);
+      }
       callback([]);
     });
     
     return unsubscribe;
   } catch (error) {
-    console.error("Error setting up listener for active kiosk sessions:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Error setting up listener for active kiosk sessions:", error);
+    }
     return () => {}; // Return empty unsubscribe function
   }
 }
@@ -68,13 +72,17 @@ export function listenToUserKioskSession(userId, callback) {
         callback(null);
       }
     }, (error) => {
-      console.error("Error listening to user's kiosk session:", error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error("Error listening to user's kiosk session:", error);
+      }
       callback(null);
     });
     
     return unsubscribe;
   } catch (error) {
-    console.error("Error setting up listener for user's kiosk session:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Error setting up listener for user's kiosk session:", error);
+    }
     return () => {}; // Return empty unsubscribe function
   }
 }
@@ -95,7 +103,9 @@ export function isHeartbeatStale(lastHeartbeat) {
     
     return (now - lastHeartbeatMs) > fiveMinutesInMs;
   } catch (error) {
-    console.error("Error checking heartbeat staleness:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Error checking heartbeat staleness:", error);
+    }
     return true;
   }
 }
@@ -112,7 +122,9 @@ export function formatTimestamp(timestamp) {
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp.seconds * 1000);
     return date.toLocaleString();
   } catch (error) {
-    console.error("Error formatting timestamp:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Error formatting timestamp:", error);
+    }
     return "Invalid date";
   }
 }
@@ -143,7 +155,9 @@ export function getTimeAgo(timestamp) {
     if (diffInDays === 1) return "1 day ago";
     return `${diffInDays} days ago`;
   } catch (error) {
-    console.error("Error calculating time ago:", error);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error("Error calculating time ago:", error);
+    }
     return "N/A";
   }
 }
