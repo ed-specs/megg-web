@@ -1,3 +1,5 @@
+//D:\CAPSTONE\megg-web-tech\app\dashboard\components\NavBar.js
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -22,12 +24,14 @@ import {
   Shield,
   User,
   LogOut,
+  MonitorDot,
 } from "lucide-react";
 import { auth, db } from "../../config/firebaseConfig.js";
 import { doc, getDoc } from "firebase/firestore";
 import { signOutUser, debugAuthState } from "../../utils/auth-utils";
 import NotificationMobile from "../../components/ui/NotificationMobile.js";
 import { saveInAppNotification } from "../../utils/notification-utils";
+import { listenToUserKioskSession } from "../../lib/kiosks/kioskSessions.js";
 
 export function Navbar() {
   const router = useRouter();
@@ -41,10 +45,15 @@ export function Navbar() {
     username: "",
     email: "",
     profileImageUrl: "",
+    accountId: "",
   });
+  const [kioskSession, setKioskSession] = useState(null);
   const profileRef = useRef(null);
 
   useEffect(() => {
+    // NOTE: This effect handles both Firebase Auth and custom localStorage auth.
+    // Consider refactoring to use a centralized auth service/hook for better maintainability.
+    
     // Function to fetch user data
     const fetchUserData = async (userId) => {
       try {
@@ -57,6 +66,7 @@ export function Navbar() {
             username: data.username || "User",
             email: data.email || "",
             profileImageUrl: data.profileImageUrl || "/default.png",
+            accountId: data.accountId || "",
           });
         }
       } catch (error) {
@@ -111,6 +121,7 @@ export function Navbar() {
                 username: "",
                 email: "",
                 profileImageUrl: "",
+                accountId: "",
               });
             }
           }
@@ -120,6 +131,7 @@ export function Navbar() {
             username: "",
             email: "",
             profileImageUrl: "",
+            accountId: "",
           });
         }
       }
@@ -127,6 +139,27 @@ export function Navbar() {
 
     return () => unsubscribe();
   }, []);
+
+  // Listen to kiosk session for current user
+  useEffect(() => {
+    if (!userData.accountId) {
+      setKioskSession(null);
+      return;
+    }
+
+    // Set up real-time listener for user's kiosk session
+    const unsubscribe = listenToUserKioskSession(userData.accountId, (session) => {
+      if (session && session.status === "active") {
+        setKioskSession(session);
+      } else {
+        setKioskSession(null);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [userData.accountId]);
 
   const toggleProfileMenu = () => {
     setProfileOpen((prev) => !prev);
@@ -165,6 +198,7 @@ export function Navbar() {
   const menus = [
     { name: "Dashboard", href: "/dashboard/overview", icon: LayoutDashboard },
     { name: "Inventory", href: "/dashboard/inventory", icon: Package },
+    { name: "Kiosks", href: "/dashboard/kiosks", icon: MonitorDot, badge: kioskSession ? "1 Kiosk Connected" : null },
   ];
 
   const historyLinks = [
@@ -226,18 +260,29 @@ export function Navbar() {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <span className="text-sm font-bold text-gray-500">Menus</span>
-            {menus.map(({ name, href, icon: Icon }) => (
+            {menus.map(({ name, href, icon: Icon, badge }) => (
               <Link
                 key={name}
                 href={href}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-150 ${
+                className={`flex items-center justify-between gap-2 px-4 py-2 rounded-lg transition-colors duration-150 ${
                   isActive(href)
                     ? "bg-[#105588] text-white"
                     : "hover:bg-gray-100"
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                {name}
+                <div className="flex items-center gap-2">
+                  <Icon className="w-5 h-5" />
+                  {name}
+                </div>
+                {badge && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                    isActive(href)
+                      ? "bg-white/20 text-white"
+                      : "bg-green-100 text-green-700"
+                  }`}>
+                    {badge}
+                  </span>
+                )}
               </Link>
             ))}
 
