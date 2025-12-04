@@ -1,4 +1,5 @@
 import { auth } from "../config/firebaseConfig"
+import { devLog, devError } from "./auth-helpers"
 
 /**
  * Get the current authenticated user
@@ -21,7 +22,7 @@ export const getCurrentUser = () => {
         const user = JSON.parse(customAuthUser)
         return user
       } catch (error) {
-        console.error("Error parsing custom auth user:", error)
+        devError("Error parsing custom auth user:", error)
         // Clear invalid custom auth data
         localStorage.removeItem("customAuthUser")
         localStorage.removeItem("useCustomAuth")
@@ -72,14 +73,14 @@ export const debugAuthState = () => {
   const useCustomAuth = localStorage.getItem("useCustomAuth")
   const customAuthUser = localStorage.getItem("customAuthUser")
   
-  console.log("=== Auth Debug Info ===")
-  console.log("Firebase Auth User:", firebaseUser)
-  console.log("Use Custom Auth:", useCustomAuth)
-  console.log("Custom Auth User:", customAuthUser)
-  console.log("getCurrentUser() result:", getCurrentUser())
-  console.log("isAuthenticated() result:", isAuthenticated())
-  console.log("getCurrentUserId() result:", getCurrentUserId())
-  console.log("=========================")
+  devLog("=== Auth Debug Info ===")
+  devLog("Firebase Auth User:", firebaseUser)
+  devLog("Use Custom Auth:", useCustomAuth)
+  devLog("Custom Auth User:", customAuthUser)
+  devLog("getCurrentUser() result:", getCurrentUser())
+  devLog("isAuthenticated() result:", isAuthenticated())
+  devLog("getCurrentUserId() result:", getCurrentUserId())
+  devLog("=========================")
 }
 
 /**

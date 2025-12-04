@@ -22,7 +22,6 @@ export default function NotificationPage() {
         const accountId = getUserAccountId();
         if (accountId) {
           const userNotifications = await getUserNotifications(accountId, 100); // Get up to 100 notifications
-          console.log("📥 Loaded notifications:", userNotifications);
           setNotifications(userNotifications);
         }
       } catch (error) {
@@ -158,18 +157,7 @@ export default function NotificationPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {notifications.map((notification) => {
-                  // Debug log for each notification
-                  console.log(`📋 Rendering notification ${notification.id.substring(0, 20)}...`, {
-                    type: notification.type,
-                    icon: notification.icon,
-                    profileImage: notification.profileImage,
-                    willShowDownloadIcon: (notification.icon === "download" || 
-                                           notification.type === "batch_list_exported" || 
-                                           notification.type === "batch_details_exported")
-                  });
-                  
-                  return (
+                {notifications.map((notification) => (
                   <div
                     key={notification.id}
                     className={`p-4 rounded-xl border transition-colors duration-200 ${
@@ -291,8 +279,7 @@ export default function NotificationPage() {
                       </div>
                     </div>
                   </div>
-                  );
-                })}
+                ))}
               </div>
             )}
           </div>

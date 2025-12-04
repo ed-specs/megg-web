@@ -79,7 +79,7 @@ export default function ChangePasswordPage() {
         return
       }
 
-      console.log("🔍 Change Password: Using document ID:", docId)
+      devLog("🔍 Change Password: Using document ID:", docId)
 
       // Get user document to check if they have a hashed password
       const userDocRef = doc(db, "users", docId)
@@ -141,9 +141,9 @@ export default function ChangePasswordPage() {
           "Your password has been successfully updated",
           "password_change"
         )
-        console.log("In-app notification created for password change")
+        devLog("In-app notification created for password change")
       } catch (notifError) {
-        console.error("Error creating password change notification:", notifError)
+        devError("Error creating password change notification:", notifError)
         // Don't block the password change if notification fails
       }
 
@@ -177,9 +177,9 @@ export default function ChangePasswordPage() {
         
         const emailResult = await emailResponse.json()
         if (emailResult.success) {
-          console.log('Password change email sent to:', emailResult.email)
+          devLog('Password change email sent to:', emailResult.email)
         } else if (emailResult.skipped) {
-          console.log('Email skipped (email notifications disabled)')
+          devLog('Email skipped (email notifications disabled)')
         }
       } catch (emailError) {
         console.error('Error sending password change email:', emailError)
@@ -207,9 +207,9 @@ export default function ChangePasswordPage() {
         
         const pushResult = await pushResponse.json()
         if (pushResult.success) {
-          console.log('Password change push notification sent')
+          devLog('Password change push notification sent')
         } else if (pushResult.skipped) {
-          console.log('Push notification skipped (disabled by user)')
+          devLog('Push notification skipped (disabled by user)')
         }
       } catch (pushError) {
         console.error('Error sending password change push notification:', pushError)

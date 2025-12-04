@@ -12,6 +12,7 @@ import {
   getDoc,
   setDoc,
 } from "firebase/firestore"
+import { devLog, devError } from "../../utils/auth-helpers"
 
 // Generate random 6 alphanumeric characters
 function generateRandomAlphanumeric() {
@@ -94,7 +95,7 @@ async function checkNotificationSettings(userId, type) {
 
     return true
   } catch (error) {
-    console.error("Error checking notification settings:", error)
+    devError("Error checking notification settings:", error)
     // On error, allow login notifications but block others
     return type === "login"
   }
@@ -134,7 +135,7 @@ export async function createNotification(accountId, message, type, read = false)
         }
       }
     } catch (error) {
-      console.error("Error finding user by accountId:", error)
+      devError("Error finding user by accountId:", error)
     }
 
     // Check notification settings if userId is found
@@ -142,12 +143,12 @@ export async function createNotification(accountId, message, type, read = false)
     if (userId) {
       const notificationsEnabled = await checkNotificationSettings(userId, type)
       if (!notificationsEnabled) {
-        console.log(`Notifications disabled for account ${accountId} and type ${type}`)
+        devLog(`Notifications disabled for account ${accountId} and type ${type}`)
         return null // Don't create notification if disabled
       }
     } else if (type !== "login") {
       // If userId not found and it's not a login notification, skip creation
-      console.log(`User not found for account ${accountId}, skipping notification creation for type ${type}`)
+      devLog(`User not found for account ${accountId}, skipping notification creation for type ${type}`)
       return null
     }
     // For login notifications, proceed even if userId is not found
@@ -210,7 +211,7 @@ export async function createNotification(accountId, message, type, read = false)
           }
         }
       } catch (error) {
-        console.error("Error getting user profile image:", error)
+        devError("Error getting user profile image:", error)
       }
     }
 
@@ -218,14 +219,14 @@ export async function createNotification(accountId, message, type, read = false)
     const notificationRef = doc(db, "notifications", notificationId)
     await setDoc(notificationRef, notificationData)
     
-    console.log(`✅ Notification created: ${notificationId} for account ${accountId}`)
-    console.log(`   Message: ${message}, Type: ${type}`)
-    console.log(`   Icon: ${notificationData.icon || 'none'}, ProfileImage: ${notificationData.profileImage || 'none'}`)
+    devLog(`✅ Notification created: ${notificationId} for account ${accountId}`)
+    devLog(`   Message: ${message}, Type: ${type}`)
+    devLog(`   Icon: ${notificationData.icon || 'none'}, ProfileImage: ${notificationData.profileImage || 'none'}`)
     
     return notificationId
   } catch (error) {
-    console.error(`❌ Error creating notification for account ${accountId}:`, error)
-    console.error(`   Error details:`, error.message, error.code)
+    devError(`❌ Error creating notification for account ${accountId}:`, error)
+    devError(`   Error details:`, error.message, error.code)
     throw error
   }
 }
@@ -267,7 +268,7 @@ export async function getUserNotifications(accountId, limitCount = 10) {
 
     return notifications
   } catch (error) {
-    console.error("Error getting notifications:", error)
+    devError("Error getting notifications:", error)
     throw error
   }
 }
@@ -281,7 +282,7 @@ export async function markNotificationAsRead(notificationId) {
     })
     return true
   } catch (error) {
-    console.error("Error marking notification as read:", error)
+    devError("Error marking notification as read:", error)
     throw error
   }
 }
@@ -293,7 +294,7 @@ export async function deleteNotification(notificationId) {
     await deleteDoc(notificationRef)
     return true
   } catch (error) {
-    console.error("Error deleting notification:", error)
+    devError("Error deleting notification:", error)
     throw error
   }
 }
@@ -314,7 +315,7 @@ export async function markAllNotificationsAsRead(accountId) {
     await Promise.all(batch)
     return true
   } catch (error) {
-    console.error("Error marking all notifications as read:", error)
+    devError("Error marking all notifications as read:", error)
     throw error
   }
 }
@@ -327,7 +328,7 @@ export async function getUnreadNotificationCount(accountId) {
     const querySnapshot = await getDocs(q)
     return querySnapshot.size
   } catch (error) {
-    console.error("Error getting unread notification count:", error)
+    devError("Error getting unread notification count:", error)
     throw error
   }
 }

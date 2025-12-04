@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { auth, db } from "../config/firebaseConfig"
 import { doc, getDoc } from "firebase/firestore"
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../utils/auth-utils"
+import { devLog, devError } from "../utils/auth-helpers"
 import Image from "next/image"
 
 export default function RouteGuard({ children, requiredRole = null, redirectTo = "/login" }) {
@@ -19,19 +20,19 @@ export default function RouteGuard({ children, requiredRole = null, redirectTo =
 
   const checkAuth = async () => {
     try {
-      console.log("🔐 Route Guard: Checking authentication...")
+      devLog("🔐 Route Guard: Checking authentication...")
       
       // Check if user is authenticated
       const user = getCurrentUser()
       const storedUser = getStoredUser()
       const accountId = getUserAccountId()
 
-      console.log("🔐 Route Guard - Firebase User:", user)
-      console.log("🔐 Route Guard - Stored User:", storedUser)
-      console.log("🔐 Route Guard - Account ID:", accountId)
+      devLog("🔐 Route Guard - Firebase User:", user)
+      devLog("🔐 Route Guard - Stored User:", storedUser)
+      devLog("🔐 Route Guard - Account ID:", accountId)
 
       if (!user && !storedUser) {
-        console.log("❌ Route Guard: No authenticated user found")
+        devLog("❌ Route Guard: No authenticated user found")
         setError("Please log in to access this page")
         router.push(redirectTo)
         return
@@ -39,7 +40,7 @@ export default function RouteGuard({ children, requiredRole = null, redirectTo =
 
       // If no role requirement, just check authentication
       if (!requiredRole) {
-        console.log("✅ Route Guard: Authentication check passed (no role required)")
+        devLog("✅ Route Guard: Authentication check passed (no role required)")
         setIsAuthorized(true)
         setIsLoading(false)
         return
@@ -48,13 +49,13 @@ export default function RouteGuard({ children, requiredRole = null, redirectTo =
       // Check user role from Firestore
       const docId = accountId || user?.uid
       if (!docId) {
-        console.log("❌ Route Guard: No user ID found")
+        devLog("❌ Route Guard: No user ID found")
         setError("Unable to verify user identity")
         router.push(redirectTo)
         return
       }
 
-      console.log(`🔍 Route Guard: Checking role for user ID: ${docId}`)
+      devLog(`🔍 Route Guard: Checking role for user ID: ${docId}`)
       
       // Get user document from Firestore
       const userDocRef = doc(db, "users", docId)
@@ -63,18 +64,18 @@ export default function RouteGuard({ children, requiredRole = null, redirectTo =
       if (!userDoc.exists()) {
         // Try with stored user role as fallback
         if (storedUser?.role) {
-          console.log(`🔄 Route Guard: Using stored user role: ${storedUser.role}`)
+          devLog(`🔄 Route Guard: Using stored user role: ${storedUser.role}`)
           
           if (storedUser.role === requiredRole) {
-            console.log(`✅ Route Guard: Access granted (stored role: ${storedUser.role})`)
+            devLog(`✅ Route Guard: Access granted (stored role: ${storedUser.role})`)
             setIsAuthorized(true)
           } else {
-            console.log(`❌ Route Guard: Access denied (required: ${requiredRole}, has: ${storedUser.role})`)
+            devLog(`❌ Route Guard: Access denied (required: ${requiredRole}, has: ${storedUser.role})`)
             setError(`Access denied. This page requires ${requiredRole} role.`)
             router.push("/unauthorized")
           }
         } else {
-          console.log("❌ Route Guard: User document not found and no stored role")
+          devLog("❌ Route Guard: User document not found and no stored role")
           setError("Unable to verify user permissions")
           router.push(redirectTo)
         }
@@ -82,20 +83,20 @@ export default function RouteGuard({ children, requiredRole = null, redirectTo =
         const userData = userDoc.data()
         const userRole = userData.role || "user"
         
-        console.log(`🔍 Route Guard: User role from Firestore: ${userRole}`)
+        devLog(`🔍 Route Guard: User role from Firestore: ${userRole}`)
         
         if (userRole === requiredRole) {
-          console.log(`✅ Route Guard: Access granted (role: ${userRole})`)
+          devLog(`✅ Route Guard: Access granted (role: ${userRole})`)
           setIsAuthorized(true)
         } else {
-          console.log(`❌ Route Guard: Access denied (required: ${requiredRole}, has: ${userRole})`)
+          devLog(`❌ Route Guard: Access denied (required: ${requiredRole}, has: ${userRole})`)
           setError(`Access denied. This page requires ${requiredRole} role.`)
           router.push("/unauthorized")
         }
       }
 
     } catch (error) {
-      console.error("❌ Route Guard: Error checking authentication:", error)
+      devError("❌ Route Guard: Error checking authentication:", error)
       setError("Authentication error occurred")
       router.push(redirectTo)
     } finally {
