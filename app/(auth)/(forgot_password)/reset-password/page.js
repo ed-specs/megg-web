@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
+import { useState, useEffect, useCallback, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { db, auth } from "../../../config/firebaseConfig"
@@ -40,18 +40,8 @@ function PasswordPageContent() {
   const token = searchParams.get("token")
   const email = searchParams.get("email")
 
-  // Determine if this is forgot password or reset password flow
-  useEffect(() => {
-    if (!token && !email) {
-      setIsForgotPassword(true)
-    } else {
-      setIsForgotPassword(false)
-      verifyToken()
-    }
-  }, [token, email])
-
   // Verify the reset token when component mounts
-  const verifyToken = async () => {
+  const verifyToken = useCallback(async () => {
     if (!token || !email) {
       setGlobalMessage("Invalid reset link. Please request a new one.")
       setTimeout(() => {
@@ -111,7 +101,17 @@ function PasswordPageContent() {
         router.push("/forgot-password")
       }, 3000)
     }
-  }
+  }, [token, email, router])
+
+  // Determine if this is forgot password or reset password flow
+  useEffect(() => {
+    if (!token && !email) {
+      setIsForgotPassword(true)
+    } else {
+      setIsForgotPassword(false)
+      verifyToken()
+    }
+  }, [token, email, verifyToken])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target

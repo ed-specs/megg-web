@@ -383,7 +383,7 @@ export default function ChangePasswordPage() {
                   <li>• Include uppercase and lowercase letters</li>
                   <li>• Add numbers and special characters</li>
                   <li>• Avoid common words or personal information</li>
-                  <li>• Don't reuse passwords from other accounts</li>
+                  <li>• Don&apos;t reuse passwords from other accounts</li>
                 </ul>
               </div>
             </div>

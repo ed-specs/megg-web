@@ -122,6 +122,7 @@ export default function QRCodeModal({
         ) : qrCodeDataUrl ? (
           <div className="flex flex-col gap-4 items-center">
             <div className="border border-gray-200 rounded-lg p-4 bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={qrCodeDataUrl}
                 alt={`QR Code for batch ${selectedBatch}`}

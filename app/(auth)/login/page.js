@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { db, auth } from "../../config/firebaseConfig"
@@ -73,14 +73,14 @@ export default function LoginPage() {
   const router = useRouter()
 
   // Helper function for role-based routing
-  const redirectBasedOnRole = (userRole, delay = 2000) => {
+  const redirectBasedOnRole = useCallback((userRole, delay = 2000) => {
     if (userRole === "admin") {
       // TODO: Create separate admin dashboard - for now redirect to user dashboard
       setTimeout(() => router.replace("/dashboard/overview"), delay)
     } else {
       setTimeout(() => router.replace("/dashboard/overview"), delay)
     }
-  }
+  }, [router])
 
   // Update time every second
   useEffect(() => {
@@ -226,7 +226,7 @@ export default function LoginPage() {
         // No redirect result or error; ignore
       }
     })()
-  }, [])
+  }, [redirectBasedOnRole])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -912,7 +912,7 @@ export default function LoginPage() {
 
             {/* Sign Up Link */}
             <div className="text-center pt-4 pb-6 md:pb-0">
-              <span className="text-gray-500 text-sm">Don't have an account? </span>
+              <span className="text-gray-500 text-sm">Don&apos;t have an account? </span>
               <button
                 onClick={viewRegister}
                 className="text-[#105588] hover:text-[#ff4a08] transition-colors text-sm font-medium"

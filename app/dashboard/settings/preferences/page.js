@@ -450,9 +450,9 @@ export default function NotificationSettings() {
                         To enable push notifications, you need to allow them in your browser:
                       </p>
                       <ol className="text-xs text-yellow-700 space-y-1 ml-4 list-decimal">
-                        <li>Click the lock/info icon (🔒 or ⓘ) in your browser's address bar</li>
-                        <li>Find "Notifications" in the permissions list</li>
-                        <li>Change it from "Block" to "Allow"</li>
+                        <li>Click the lock/info icon (🔒 or ⓘ) in your browser&apos;s address bar</li>
+                        <li>Find &quot;Notifications&quot; in the permissions list</li>
+                        <li>Change it from &quot;Block&quot; to &quot;Allow&quot;</li>
                         <li>Refresh this page and toggle the switch above</li>
                       </ol>
                     </div>

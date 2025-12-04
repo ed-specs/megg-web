@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { auth, db } from "../config/firebaseConfig"
 import { doc, getDoc } from "firebase/firestore"
@@ -14,11 +14,7 @@ export default function RouteGuard({ children, requiredRole = null, redirectTo =
   const [error, setError] = useState("")
   const router = useRouter()
 
-  useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
+  const checkAuth = useCallback(async () => {
     try {
       devLog("🔐 Route Guard: Checking authentication...")
       
@@ -102,7 +98,11 @@ export default function RouteGuard({ children, requiredRole = null, redirectTo =
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [requiredRole, redirectTo, router])
+
+  useEffect(() => {
+    checkAuth()
+  }, [checkAuth])
 
   if (isLoading) {
     return (

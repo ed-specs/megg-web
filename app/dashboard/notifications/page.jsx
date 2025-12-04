@@ -153,7 +153,7 @@ export default function NotificationPage() {
               <div className="flex flex-col items-center justify-center py-12 text-center">
                 <BellOff className="w-16 h-16 text-gray-300 mb-4" />
                 <h3 className="text-lg font-semibold text-gray-700 mb-2">No notifications</h3>
-                <p className="text-gray-500 text-sm">You don't have any notifications at the moment</p>
+                <p className="text-gray-500 text-sm">You don&apos;t have any notifications at the moment</p>
               </div>
             ) : (
               <div className="space-y-2">
