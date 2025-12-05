@@ -99,7 +99,7 @@ export function EggSizeStats({ timeFrame = "daily" }) {
         <StatItem
           icon={Clock}
           label="Avg/Hour"
-          value={stats.avgEggsPerHour.toFixed(1)}
+          value={(stats.avgEggsPerHour || 0).toFixed(1)}
           color="purple"
         />
         <StatItem

@@ -1,6 +1,6 @@
 import { collection, getDocs, query, where, orderBy, doc, getDoc } from "firebase/firestore"
 import { db } from "../../../config/firebaseConfig"
-import { getCurrentUser } from "../../../utils/auth-utils"
+import { getUserAccountId } from "../../../utils/auth-utils"
 
 // Helpers
 const tsToDate = (ts) => {
@@ -15,14 +15,12 @@ const tsToDate = (ts) => {
   }
 }
 
-const getCurrentAccountId = async () => {
+const getCurrentAccountId = () => {
   try {
-    const user = getCurrentUser()
-    if (!user) return null
-    const ref = doc(db, "users", user.uid)
-    const snap = await getDoc(ref)
-    if (!snap.exists()) return null
-    return snap.data()?.accountId || null
+    // Use getUserAccountId which reads directly from localStorage
+    const accountId = getUserAccountId()
+    console.log('[EggSizeStats] Retrieved accountId from localStorage:', accountId)
+    return accountId
   } catch (e) {
     console.error("EggSizeStats: failed to get accountId", e)
     return null
@@ -44,20 +42,14 @@ const pickMostCommonSize = (counts) => {
 // Get egg size statistics for linked machines
 export const getMachineLinkedEggSizeStats = async (period = 'daily') => {
   try {
-    const accountId = await getCurrentAccountId()
+    const accountId = getCurrentAccountId()
+    console.log('[EggSizeStats] Current accountId:', accountId)
     if (!accountId) {
       return { totalEggs: 0, avgEggsPerHour: 0, sortingAccuracy: "0.00%", mostCommonSize: "None" }
     }
 
-    // Window depends on period
-    const endDate = new Date()
-    const startDate = new Date()
-    if (period === 'monthly') {
-      startDate.setMonth(endDate.getMonth() - 6)
-    } else {
-      // Daily = today only (midnight to now)
-      startDate.setHours(0, 0, 0, 0)
-    }
+    // Get ALL batches for this account (no date filtering)
+    console.log('[EggSizeStats] Fetching ALL batches for accountId:', accountId)
 
     const qBatches = query(
       collection(db, "batches"),
@@ -65,12 +57,13 @@ export const getMachineLinkedEggSizeStats = async (period = 'daily') => {
     )
 
     const snap = await getDocs(qBatches)
-    const batches = snap.docs
-      .map(d => d.data())
-      .filter(b => {
-        const created = tsToDate(b?.createdAt)
-        return created >= startDate && created <= endDate
-      })
+    console.log('[EggSizeStats] Found', snap.size, 'batch documents')
+    const batches = snap.docs.map(d => {
+      const data = d.data()
+      console.log('[EggSizeStats] Batch:', data.id, 'created:', data.createdAt, 'stats:', data.stats)
+      return data
+    })
+    console.log('[EggSizeStats] Processing', batches.length, 'batches')
 
     // Aggregate counts (from batches)
     let totals = { small: 0, medium: 0, large: 0, defect: 0, good: 0 }
@@ -85,7 +78,7 @@ export const getMachineLinkedEggSizeStats = async (period = 'daily') => {
       totals.small += Number(s.smallEggs || 0)
       totals.medium += Number(s.mediumEggs || 0)
       totals.large += Number(s.largeEggs || 0)
-      totals.defect += Number((s.badEggs || 0) + (s.dirtyEggs || 0))
+      totals.defect += Number((s.crackEggs || 0) + (s.dirtyEggs || 0))
       if (typeof s.goodEggs === 'number') {
         totalGoodFromBatches += Number(s.goodEggs)
         foundGoodField = true
@@ -103,7 +96,7 @@ export const getMachineLinkedEggSizeStats = async (period = 'daily') => {
       minutesSum += durMin
       const totalThisBatch = typeof s.totalEggs === 'number'
         ? Number(s.totalEggs)
-        : (Number(s.smallEggs||0) + Number(s.mediumEggs||0) + Number(s.largeEggs||0) + Number((s.badEggs||0) + (s.dirtyEggs||0)))
+        : (Number(s.smallEggs||0) + Number(s.mediumEggs||0) + Number(s.largeEggs||0) + Number((s.crackEggs||0) + (s.dirtyEggs||0)))
       eggsTotalForRate += totalThisBatch
     })
 
@@ -116,8 +109,8 @@ export const getMachineLinkedEggSizeStats = async (period = 'daily') => {
     let totalAllEggs = Math.round(eggsTotalForRate)
     let mostCommonSize = pickMostCommonSize({ small: totals.small, medium: totals.medium, large: totals.large })
 
-    // Fallbacks: if batches lacked explicit goodEggs, try deriving from eggs collection
-    if (!foundGoodField) {
+    // Fallbacks: if no eggs found in batches, try reading from eggs collection directly
+    if (!foundGoodField || totalEggsSorted === 0) {
       const qEggs = query(
         collection(db, "eggs"),
         where("accountId", "==", accountId)
@@ -129,12 +122,13 @@ export const getMachineLinkedEggSizeStats = async (period = 'daily') => {
       eggsSnap.docs.forEach(d => {
         const e = d.data() || {}
         const created = tsToDate(e?.createdAt)
-        if (created < startDate || created > endDate) return
+        console.log('[EggSizeStats] Egg:', e.eggId, 'created:', created, 'size:', e.size, 'quality:', e.quality)
         const q = (e.quality || "").toString().toLowerCase()
-        if (q === 'small') small++
-        else if (q === 'medium') medium++
-        else if (q === 'large') large++
-        else if (q === 'bad' || q === 'dirty' || q === 'defect') defect++
+        const sz = (e.size || "").toString().toLowerCase()
+        if (sz === 'small') small++
+        else if (sz === 'medium') medium++
+        else if (sz === 'large') large++
+        if (q === 'cracked' || q === 'dirty') defect++
         else if (q === 'good') { goodCount++ }
         totalEggsAll++
         first = !first || created < first ? created : first
@@ -149,23 +143,35 @@ export const getMachineLinkedEggSizeStats = async (period = 'daily') => {
       totalAllEggs = totalEggsAll
     }
     // Defect stats
-    const bad = batches.reduce((sum, b) => sum + Number((b?.stats?.badEggs) || 0), 0)
+    const cracked = batches.reduce((sum, b) => sum + Number((b?.stats?.crackEggs) || 0), 0)
     const dirty = batches.reduce((sum, b) => sum + Number((b?.stats?.dirtyEggs) || 0), 0)
     const mostCommonDefect = (() => {
-      if (bad === 0 && dirty === 0) return 'None'
-      if (bad === dirty) return 'Bad & Dirty'
-      return bad > dirty ? 'Bad' : 'Dirty'
+      if (cracked === 0 && dirty === 0) return 'None'
+      if (cracked === dirty) return 'Cracked & Dirty'
+      return cracked > dirty ? 'Cracked' : 'Dirty'
     })()
     const denominator = totalEggsSorted + totalDefects
     const defectRate = denominator > 0 ? `${Math.round((totalDefects / denominator) * 100)}%` : '0%'
+    
+    // Convert eggs per minute to eggs per hour
+    const avgEggsPerHour = eggsPerMinute * 60
 
-    return { totalEggs: totalEggsSorted, totalAllEggs, totalDefects, eggsPerMinute, mostCommonSize, mostCommonDefect, defectRate }
+    return { 
+      totalEggs: totalEggsSorted, 
+      totalAllEggs, 
+      totalDefects, 
+      avgEggsPerHour,  // Component expects this field name
+      mostCommonSize, 
+      mostCommonDefect, 
+      defectRate 
+    }
   } catch (error) {
     console.error("Error getting egg size stats:", error)
     return {
       totalEggs: 0,
+      totalAllEggs: 0,
       totalDefects: 0,
-      eggsPerMinute: 0,
+      avgEggsPerHour: 0,  // Component expects this field name
       mostCommonSize: "None",
       mostCommonDefect: "None",
       defectRate: "0%"
@@ -176,33 +182,17 @@ export const getMachineLinkedEggSizeStats = async (period = 'daily') => {
 // Get egg size distribution for linked machines
 export const getMachineLinkedEggSizeDistribution = async (period = 'daily') => {
   try {
-    const accountId = await getCurrentAccountId()
+    const accountId = getCurrentAccountId()
     if (!accountId) return []
 
-    // Window depends on period (match stats function)
-    const endDate = new Date()
-    const startDate = new Date()
-    if (period === 'monthly') {
-      startDate.setMonth(endDate.getMonth() - 6)
-    } else if (period === 'weekly') {
-      startDate.setDate(endDate.getDate() - 7)
-    } else {
-      // Daily = today only
-      startDate.setHours(0, 0, 0, 0)
-    }
-
+    // Get ALL batches (no date filtering)
     const qBatches = query(
       collection(db, "batches"),
       where("accountId", "==", accountId)
     )
 
     const snapshot = await getDocs(qBatches)
-    const docs = snapshot.docs
-      .map(d => d.data())
-      .filter(b => {
-        const created = tsToDate(b?.createdAt)
-        return created >= startDate && created <= endDate
-      })
+    const docs = snapshot.docs.map(d => d.data())
 
     // Sum buckets from batch stats
     const sizeCounts = { large: 0, medium: 0, small: 0, defect: 0 }
@@ -211,30 +201,34 @@ export const getMachineLinkedEggSizeDistribution = async (period = 'daily') => {
       sizeCounts.large += Number(s.largeEggs || 0)
       sizeCounts.medium += Number(s.mediumEggs || 0)
       sizeCounts.small += Number(s.smallEggs || 0)
-      sizeCounts.defect += Number((s.badEggs || 0) + (s.dirtyEggs || 0))
+      sizeCounts.defect += Number((s.crackEggs || 0) + (s.dirtyEggs || 0))
       // Note: if only goodEggs without size buckets, we don't include an 'Unspecified' bucket
     })
 
     let totalEggs = Object.values(sizeCounts).reduce((a,b)=>a+b,0)
 
-    // Fallback: compute distribution from eggs if batches have no counts
+    // Always try to read from eggs collection if batches are empty or for debugging
     if (totalEggs === 0) {
+      console.log('[EggSizeStats] No eggs in batches, querying eggs collection directly for accountId:', accountId)
       const qEggs = query(
         collection(db, "eggs"),
         where("accountId", "==", accountId)
       )
       const eggsSnap = await getDocs(qEggs)
+      console.log('[EggSizeStats] Found', eggsSnap.size, 'egg documents')
       eggsSnap.docs.forEach(d => {
         const e = d.data() || {}
         const created = tsToDate(e?.createdAt)
-        if (created < startDate || created > endDate) return
+        console.log('[EggSizeStats] Egg:', e.eggId, 'created:', created, 'size:', e.size, 'quality:', e.quality)
+        const sz = (e.size || "").toString().toLowerCase()
         const q = (e.quality || "").toString().toLowerCase()
-        if (q === 'small') sizeCounts.small++
-        else if (q === 'medium') sizeCounts.medium++
-        else if (q === 'large') sizeCounts.large++
-        else if (q === 'bad' || q === 'dirty' || q === 'defect') sizeCounts.defect++
+        if (sz === 'small') sizeCounts.small++
+        else if (sz === 'medium') sizeCounts.medium++
+        else if (sz === 'large') sizeCounts.large++
+        if (q === 'cracked' || q === 'dirty') sizeCounts.defect++
       })
       totalEggs = Object.values(sizeCounts).reduce((a,b)=>a+b,0)
+      console.log('[EggSizeStats] Final sizeCounts:', sizeCounts, 'totalEggs:', totalEggs)
     }
     const colors = {
       large: "#b0b0b0",
@@ -250,9 +244,10 @@ export const getMachineLinkedEggSizeDistribution = async (period = 'daily') => {
       defect: "Defect"
     }
 
-    // Create segments for donut chart
+    // Create segments for donut chart (use 'label' to match component expectations)
     const segments = Object.entries(sizeCounts).map(([size, count]) => ({
-      name: labels[size] || size,
+      label: labels[size] || size,
+      value: count,  // Also provide 'value' for consistency
       count,
       percentage: totalEggs > 0 ? Math.round((count / totalEggs) * 100) : 0,
       color: colors[size] || "#000000"

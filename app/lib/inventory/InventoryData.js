@@ -1,6 +1,6 @@
 import { collection, getDocs, query, where, doc, getDoc, updateDoc } from "firebase/firestore"
 import { db } from "../../config/firebaseConfig"
-import { getUserAccountId, getCurrentUser } from "../../utils/auth-utils"
+import { getUserAccountId } from "../../utils/auth-utils"
 
 // Helper: robustly convert Firestore Timestamp or JS date-like to Date
 const tsToDate = (ts) => {
@@ -24,68 +24,14 @@ export const getUserLinkedMachines = async () => {
   return []
 }
 
-// Helper: get current user's accountId
-const getCurrentAccountId = async () => {
+// Helper: get current user's accountId (simplified - reads from localStorage)
+const getCurrentAccountId = () => {
   try {
-    let accountId = getUserAccountId()
-    
-    if (!accountId) {
-      // Try to parse and extract accountId manually
-      const userStr = localStorage.getItem("user")
-      if (userStr) {
-        try {
-          const user = JSON.parse(userStr)
-          accountId = user?.accountId
-        } catch (e) {
-          // Silent fail
-        }
-      }
-      
-      if (!accountId) {
-        const customAuthUserStr = localStorage.getItem("customAuthUser")
-        if (customAuthUserStr) {
-          try {
-            const customUser = JSON.parse(customAuthUserStr)
-            accountId = customUser?.accountId
-          } catch (e) {
-            // Silent fail
-          }
-        }
-      }
-      
-      // If still no accountId, try to get it from Firestore user document
-      if (!accountId) {
-        try {
-          const user = getCurrentUser()
-          if (user?.uid) {
-            const userDocRef = doc(db, "users", user.uid)
-            const userDoc = await getDoc(userDocRef)
-            if (userDoc.exists()) {
-              const userData = userDoc.data()
-              accountId = userData?.accountId
-            }
-            
-            if (!accountId) {
-              const usersQuery = query(collection(db, "users"), where("uid", "==", user.uid))
-              const usersSnapshot = await getDocs(usersQuery)
-              if (!usersSnapshot.empty) {
-                const userData = usersSnapshot.docs[0].data()
-                accountId = userData?.accountId
-              }
-            }
-          }
-        } catch (e) {
-          // Silent fail
-        }
-      }
-      
-      if (!accountId) {
-        return null
-      }
-    }
-    
-    return String(accountId).trim()
+    const accountId = getUserAccountId()
+    console.log('[InventoryData] Retrieved accountId from localStorage:', accountId)
+    return accountId ? String(accountId).trim() : null
   } catch (error) {
+    console.error('[InventoryData] Failed to get accountId:', error)
     return null
   }
 }
@@ -97,7 +43,7 @@ const getCurrentAccountId = async () => {
 export const getMachineLinkedInventoryData = async () => {
   try {
     // New model: use current user's accountId and read aggregate batch docs
-    const accountId = await getCurrentAccountId()
+    const accountId = getCurrentAccountId()
     if (!accountId) {
       return []
     }
@@ -177,7 +123,7 @@ export const getMachineLinkedInventoryData = async () => {
  */
 export const getMachineLinkedBatchDetails = async (batchId) => {
   try {
-    const accountId = await getCurrentAccountId()
+    const accountId = getCurrentAccountId()
     if (!accountId) return null
 
     // Query batch by accountId and match by id, name, or document ID
@@ -243,7 +189,7 @@ export const getMachineLinkedBatchDetails = async (batchId) => {
  */
 export const updateBatchStatus = async (batchId, status) => {
   try {
-    const accountId = await getCurrentAccountId()
+    const accountId = getCurrentAccountId()
     if (!accountId) {
       console.error("InventoryData: No accountId found")
       return false
@@ -286,7 +232,7 @@ export const updateBatchStatus = async (batchId, status) => {
  */
 export const getMachineLinkedBatchIds = async () => {
   try {
-    const accountId = await getCurrentAccountId()
+    const accountId = getCurrentAccountId()
     if (!accountId) return []
 
     const batchesRef = collection(db, "batches")

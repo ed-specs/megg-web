@@ -1,6 +1,6 @@
 import { collection, getDocs, query, where, orderBy, doc, getDoc } from "firebase/firestore"
 import { db } from "../../../config/firebaseConfig"
-import { getCurrentUser } from "../../../utils/auth-utils"
+import { getUserAccountId } from "../../../utils/auth-utils"
 
 // Helpers
 const tsToDate = (ts) => {
@@ -15,19 +15,12 @@ const tsToDate = (ts) => {
   }
 }
 
-const getCurrentAccountId = async () => {
+const getCurrentAccountId = () => {
   try {
-    const user = getCurrentUser()
-    if (!user) {
-      console.log("No authenticated user found")
-      return null
-    }
-
-    const userDocRef = doc(db, "users", user.uid)
-    const userDoc = await getDoc(userDocRef)
-    if (!userDoc.exists()) return null
-    const data = userDoc.data()
-    return data?.accountId || null
+    // Use getUserAccountId which reads directly from localStorage
+    const accountId = getUserAccountId()
+    console.log('[TotalEggsChart] Retrieved accountId from localStorage:', accountId)
+    return accountId
   } catch (error) {
     console.error("Error getting accountId:", error)
     return null
@@ -37,26 +30,17 @@ const getCurrentAccountId = async () => {
 // Get daily total eggs data for linked machines
 export const getMachineLinkedDailyTotalEggs = async () => {
   try {
-    const accountId = await getCurrentAccountId()
+    const accountId = getCurrentAccountId()
     if (!accountId) return []
 
-    // Get data for the last 7 days
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setDate(endDate.getDate() - 7)
-
+    // Get ALL batches (no date filtering)
     const batchesQ = query(
       collection(db, "batches"),
       where("accountId", "==", accountId)
     )
 
     const snapshot = await getDocs(batchesQ)
-    const docs = snapshot.docs
-      .map(d => d.data())
-      .filter(b => {
-        const created = tsToDate(b?.createdAt)
-        return created >= startDate && created <= endDate
-      })
+    const docs = snapshot.docs.map(d => d.data())
 
     // Group by day and sum total eggs
     const dailyData = {}
@@ -98,26 +82,17 @@ export const getMachineLinkedDailyTotalEggs = async () => {
 // Get monthly total eggs data for linked machines
 export const getMachineLinkedMonthlyTotalEggs = async () => {
   try {
-    const accountId = await getCurrentAccountId()
+    const accountId = getCurrentAccountId()
     if (!accountId) return []
 
-    // Get data for the last 6 months
-    const endDate = new Date()
-    const startDate = new Date()
-    startDate.setMonth(endDate.getMonth() - 6)
-
+    // Get ALL batches (no date filtering)
     const batchesQ = query(
       collection(db, "batches"),
       where("accountId", "==", accountId)
     )
 
     const snapshot = await getDocs(batchesQ)
-    const docs = snapshot.docs
-      .map(d => d.data())
-      .filter(b => {
-        const created = tsToDate(b?.createdAt)
-        return created >= startDate && created <= endDate
-      })
+    const docs = snapshot.docs.map(d => d.data())
 
     // Group by month and sum total eggs
     const monthlyData = {}

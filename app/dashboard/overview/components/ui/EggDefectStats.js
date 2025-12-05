@@ -108,7 +108,7 @@ export function EggDefectStats({ timeFrame = "daily" }) {
         <StatItem
           icon={Clock}
           label="Defects/Hour"
-          value={stats.avgDefectsPerHour.toFixed(1)}
+          value={(stats.avgDefectsPerHour || 0).toFixed(1)}
           color="orange"
         />
         <StatItem

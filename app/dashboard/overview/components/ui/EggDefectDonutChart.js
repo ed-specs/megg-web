@@ -13,7 +13,16 @@ export function EggDefectDonutChart({ segments = [] }) {
     );
   }
 
-  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+  // Support both 'value' and 'count' properties
+  const total = segments.reduce((sum, segment) => sum + (segment.value || segment.count || 0), 0);
+  
+  if (total === 0) {
+    return (
+      <div className="flex items-center justify-center w-48 h-48 bg-gray-50 rounded-full">
+        <p className="text-gray-400 text-sm">No data</p>
+      </div>
+    );
+  }
   const radius = 70;
   const strokeWidth = 20;
   const normalizedRadius = radius - strokeWidth * 0.5;
@@ -47,16 +56,20 @@ export function EggDefectDonutChart({ segments = [] }) {
         />
         
         {segments.map((segment, index) => {
-          const percentage = (segment.value / total) * 100;
-          const strokeDasharray = `${percentage * circumference / 100} ${circumference}`;
-          const strokeDashoffset = -cumulativePercentage * circumference / 100;
+          const value = segment.value || segment.count || 0;
+          const label = segment.label || segment.name || 'Unknown';
+          const segmentColor = segment.color || colors[label] || "#6B7280";
+          
+          const percentage = total > 0 ? (value / total) * 100 : 0;
+          const strokeDasharray = `${(percentage * circumference / 100) || 0} ${circumference}`;
+          const strokeDashoffset = -(cumulativePercentage * circumference / 100) || 0;
           
           cumulativePercentage += percentage;
 
           return (
             <circle
-              key={segment.label}
-              stroke={colors[segment.label] || "#6B7280"}
+              key={`${label}-${index}`}
+              stroke={segmentColor}
               fill="transparent"
               strokeWidth={hoveredSegment === index ? strokeWidth + 4 : strokeWidth}
               strokeDasharray={strokeDasharray}
@@ -85,27 +98,33 @@ export function EggDefectDonutChart({ segments = [] }) {
       {/* Legend */}
       <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 translate-y-full">
         <div className="flex flex-wrap justify-center gap-2 mt-4">
-          {segments.map((segment, index) => (
-            <div
-              key={segment.label}
-              className="flex items-center gap-1 text-xs"
-            >
+          {segments.map((segment, index) => {
+            const value = segment.value || segment.count || 0;
+            const label = segment.label || segment.name || 'Unknown';
+            const segmentColor = segment.color || colors[label] || "#6B7280";
+            
+            return (
               <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: colors[segment.label] || "#6B7280" }}
-              />
-              <span className="text-gray-600">
-                {segment.label} ({segment.value})
-              </span>
-            </div>
-          ))}
+                key={`legend-${label}-${index}`}
+                className="flex items-center gap-1 text-xs"
+              >
+                <div
+                  className="w-3 h-3 rounded-full"
+                  style={{ backgroundColor: segmentColor }}
+                />
+                <span className="text-gray-600">
+                  {label} ({value})
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Hover tooltip */}
-      {hoveredSegment !== null && (
+      {hoveredSegment !== null && segments[hoveredSegment] && (
         <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full bg-black text-white px-2 py-1 rounded text-xs whitespace-nowrap">
-          {segments[hoveredSegment].label}: {segments[hoveredSegment].value} ({((segments[hoveredSegment].value / total) * 100).toFixed(1)}%)
+          {segments[hoveredSegment].label || segments[hoveredSegment].name}: {segments[hoveredSegment].value || segments[hoveredSegment].count || 0} ({(((segments[hoveredSegment].value || segments[hoveredSegment].count || 0) / (total || 1)) * 100).toFixed(1)}%)
         </div>
       )}
     </div>
