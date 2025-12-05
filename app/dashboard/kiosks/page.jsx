@@ -223,7 +223,7 @@ export default function KiosksPage() {
                       No Kiosk Connected
                     </h3>
                     <p className="text-gray-500 mt-1 text-sm sm:text-base">
-                      You don't have an active kiosk session at the moment.
+                      You don&apos;t have an active kiosk session at the moment.
                     </p>
                     <p className="text-gray-400 mt-2 text-xs sm:text-sm">
                       Log in to a kiosk to see your session details here.
