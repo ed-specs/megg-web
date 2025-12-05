@@ -252,6 +252,9 @@ export default function EditProfile() {
 
       console.log("💾 Edit Profile: Saving image to document ID:", docId)
 
+      // Declare notificationAccountId for use throughout the function
+      const notificationAccountId = accountId || docId
+
       // Handle image upload
       console.log("📷 Edit Profile: Processing edited image upload...")
       setGlobalMessage("Uploading image...")
@@ -268,7 +271,6 @@ export default function EditProfile() {
 
         // Create notification for profile image change
         try {
-          const notificationAccountId = accountId || docId
           if (!oldProfileImageUrl && imageUrl) {
             // Profile picture added
             await createNotification(notificationAccountId, "You've added a new profile picture", "profile_image_added")
@@ -548,13 +550,13 @@ export default function EditProfile() {
     return (
       <div className="min-h-screen container mx-auto text-[#1F2421] relative">
           {/* MAIN */}
-          <div className="flex gap-6 p-4 md:p-6">
+          <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
             {/* Desktop Sidebar */}
             <div className="hidden lg:block">
               <Navbar />
             </div>
 
-            <div className="flex flex-1 flex-col gap-6 w-full">
+            <div className="flex flex-1 flex-col gap-4 md:gap-6 w-full min-w-0">
               {/* Header Skeleton */}
               <div className="bg-white border border-gray-300 rounded-2xl shadow p-6">
                 <div className="flex items-center justify-between">
@@ -631,20 +633,34 @@ export default function EditProfile() {
 
         {/* MAIN */}
         <div className="flex gap-6 p-4 md:p-6">
-          {/* Desktop Sidebar */}
-          <div className="hidden lg:block">
-            <Navbar />
-          </div>
+            {/* Desktop Sidebar */}
+            <div className="hidden lg:block">
+              <Navbar />
+            </div>
 
-          <div className="flex flex-1 flex-col gap-6 w-full">
+            <div className="flex flex-1 flex-col gap-4 md:gap-6 w-full min-w-0">
             {/* Header */}
             <Header setSidebarOpen={setSidebarOpen} />
 
             {/* Main container */}
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-4 md:gap-6">
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                    Edit Profile
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-1">
+                    Update your personal and farm information
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Profile Image Section */}
-            <div className="bg-white border border-gray-300 rounded-2xl shadow p-6">
-              <h2 className="text-xl font-bold text-[#1F2421] mb-6">Profile Picture</h2>
+            <div className="bg-white border border-gray-300 rounded-2xl shadow p-4 md:p-6">
+              <h2 className="text-lg md:text-xl font-bold text-[#1F2421] mb-4 md:mb-6">Profile Picture</h2>
               <div className="flex flex-col lg:flex-row items-center gap-8">
                 <div className="relative">
                   <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-white shadow-lg">
@@ -760,8 +776,8 @@ export default function EditProfile() {
             </div>
 
             {/* Profile Information */}
-            <div className="bg-white border border-gray-300 rounded-2xl shadow p-6">
-              <h2 className="text-xl font-bold text-[#1F2421] mb-6">Personal Information</h2>
+            <div className="bg-white border border-gray-300 rounded-2xl shadow p-4 md:p-6">
+              <h2 className="text-lg md:text-xl font-bold text-[#1F2421] mb-4 md:mb-6">Personal Information</h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-[#1F2421] mb-3">

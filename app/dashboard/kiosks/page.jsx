@@ -96,7 +96,7 @@ export default function KiosksPage() {
       </div>
 
       {/* MAIN */}
-      <div className="flex gap-4 sm:gap-6 p-3 sm:p-4 md:p-6">
+      <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Navbar />
@@ -108,13 +108,17 @@ export default function KiosksPage() {
 
           {/* Main container */}
           <div className="flex flex-col gap-4 sm:gap-6">
-            {/* Page Title */}
-            <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-300 p-3 sm:p-4 md:p-6">
-              <div className="min-w-0">
-                <h2 className="text-lg sm:text-xl font-semibold truncate">Active Kiosk</h2>
-                <p className="text-gray-500 text-xs sm:text-sm mt-1">
-                  Monitor your kiosk connection status
-                </p>
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                    Active Kiosk
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-1">
+                    Monitor your kiosk connection status
+                  </p>
+                </div>
               </div>
             </div>
 

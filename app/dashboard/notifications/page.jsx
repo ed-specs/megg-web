@@ -5,7 +5,7 @@ import { Navbar } from "../components/NavBar";
 import { Header } from "../components/Header";
 import { getUserNotifications, markNotificationAsRead, deleteNotification, markAllNotificationsAsRead } from "../../lib/notifications/NotificationsService";
 import { getUserAccountId } from "../../utils/auth-utils";
-import { Bell, BellOff, Check, Trash, CheckCheck, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, AlertTriangle, RefreshCw, Filter, Shield, MonitorDot, Wifi } from "lucide-react";
+import { Bell, BellOff, Check, Trash, Trash2, CheckCheck, LogIn, Building2, User, Mail, Phone, MapPin, Calendar, Image as ImageIcon, Lock, Settings, Download, AlertTriangle, RefreshCw, Filter, Shield, MonitorDot, Wifi } from "lucide-react";
 import Image from "next/image";
 import LoadingLogo from "../components/LoadingLogo";
 import { useLoadingDelay } from "../components/useLoadingDelay";
@@ -111,24 +111,24 @@ export default function NotificationPage() {
       </div>
 
       {/* MAIN */}
-      <div className="flex gap-6 p-4 md:p-6">
+      <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Navbar />
         </div>
 
-        <div className="flex flex-1 flex-col gap-6 w-full">
+        <div className="flex flex-1 flex-col gap-4 md:gap-6 w-full min-w-0">
           {/* Header */}
           <Header setSidebarOpen={setSidebarOpen} />
 
           {/* Main container */}
-          <div className="bg-white border border-gray-300 rounded-2xl shadow p-6">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <Bell className="w-6 h-6 text-[#105588]" />
-                <h1 className="text-2xl font-bold text-[#1F2421]">Notifications</h1>
+          <div className="bg-white border border-gray-300 rounded-2xl shadow p-4 md:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 md:mb-6">
+              <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                <Bell className="w-5 h-5 md:w-6 md:h-6 text-[#105588] flex-shrink-0" />
+                <h1 className="text-xl md:text-2xl font-bold text-[#1F2421]">Notifications</h1>
                 {unreadCount > 0 && (
-                  <span className="px-3 py-1 bg-[#105588] text-white text-sm font-semibold rounded-full">
+                  <span className="px-2 md:px-3 py-0.5 md:py-1 bg-[#105588] text-white text-xs md:text-sm font-semibold rounded-full flex-shrink-0">
                     {unreadCount} new
                   </span>
                 )}
@@ -136,45 +136,46 @@ export default function NotificationPage() {
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllAsRead}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors duration-200 text-sm font-semibold"
+                  className="flex items-center gap-2 px-3 md:px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors duration-200 text-xs md:text-sm font-semibold flex-shrink-0"
                 >
                   <CheckCheck className="w-4 h-4" />
-                  Mark all as read
+                  <span className="hidden sm:inline">Mark all as read</span>
+                  <span className="sm:hidden">Mark read</span>
                 </button>
               )}
             </div>
 
             {/* Loading State */}
             {showLoading ? (
-              <div className="py-12">
+              <div className="py-8 md:py-12">
                 <LoadingLogo message="Loading notifications..." />
               </div>
             ) : notifications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <BellOff className="w-16 h-16 text-gray-300 mb-4" />
-                <h3 className="text-lg font-semibold text-gray-700 mb-2">No notifications</h3>
-                <p className="text-gray-500 text-sm">You don&apos;t have any notifications at the moment</p>
+              <div className="flex flex-col items-center justify-center py-8 md:py-12 text-center">
+                <BellOff className="w-10 h-10 md:w-12 md:h-12 md:w-16 md:h-16 text-gray-300 mb-3 md:mb-4" />
+                <h3 className="text-base md:text-lg font-semibold text-gray-700 mb-2">No notifications</h3>
+                <p className="text-gray-500 text-xs md:text-sm">You don&apos;t have any notifications at the moment</p>
               </div>
             ) : (
               <div className="space-y-2">
                 {notifications.map((notification) => (
                   <div
                     key={notification.id}
-                    className={`p-4 rounded-xl border transition-colors duration-200 ${
+                    className={`p-3 md:p-4 rounded-xl border transition-colors duration-200 ${
                       notification.read
                         ? "bg-white border-gray-200"
                         : "bg-blue-50 border-blue-200"
                     }`}
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-2 md:gap-4">
                       {/* Icon Display */}
                       <div className="relative flex-shrink-0">
                         {/* Export notifications - Download icon */}
                         {(notification.icon === "download" || 
                           notification.type === "batch_list_exported" || 
                           notification.type === "batch_details_exported") ? (
-                          <div className="w-12 h-12 bg-green-500 flex items-center justify-center rounded-full">
-                            <Download className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-green-500 flex items-center justify-center rounded-full">
+                            <Download className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         /* Error/Alert notifications - Alert icon */
                         ) : (notification.icon === "alert" || 
@@ -182,84 +183,89 @@ export default function NotificationPage() {
                                notification.type === "batch_status_update_failed" ||
                                notification.type === "inventory_refresh_failed" ||
                                notification.type === "inventory_load_failed") ? (
-                          <div className="w-12 h-12 bg-red-500 flex items-center justify-center rounded-full">
-                            <AlertTriangle className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-red-500 flex items-center justify-center rounded-full">
+                            <AlertTriangle className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         /* Status update - Check icon */
                         ) : (notification.icon === "check" || notification.type === "batch_status_updated") ? (
-                          <div className="w-12 h-12 bg-emerald-500 flex items-center justify-center rounded-full">
-                            <Check className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-emerald-500 flex items-center justify-center rounded-full">
+                            <Check className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
+                          </div>
+                        /* Batch deleted - Trash icon */
+                        ) : notification.type === "batch_deleted" ? (
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-red-600 flex items-center justify-center rounded-full">
+                            <Trash2 className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "login" ? (
-                          <div className="w-12 h-12 bg-[#105588] flex items-center justify-center rounded-full">
-                            <LogIn className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-[#105588] flex items-center justify-center rounded-full">
+                            <LogIn className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "farm" ? (
-                          <div className="w-12 h-12 bg-green-500 flex items-center justify-center rounded-full">
-                            <Building2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-green-500 flex items-center justify-center rounded-full">
+                            <Building2 className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "user" ? (
-                          <div className="w-12 h-12 bg-blue-500 flex items-center justify-center rounded-full">
-                            <User className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500 flex items-center justify-center rounded-full">
+                            <User className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "mail" ? (
-                          <div className="w-12 h-12 bg-purple-500 flex items-center justify-center rounded-full">
-                            <Mail className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-purple-500 flex items-center justify-center rounded-full">
+                            <Mail className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "phone" ? (
-                          <div className="w-12 h-12 bg-teal-500 flex items-center justify-center rounded-full">
-                            <Phone className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-teal-500 flex items-center justify-center rounded-full">
+                            <Phone className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "map" ? (
-                          <div className="w-12 h-12 bg-orange-500 flex items-center justify-center rounded-full">
-                            <MapPin className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-500 flex items-center justify-center rounded-full">
+                            <MapPin className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "calendar" ? (
-                          <div className="w-12 h-12 bg-pink-500 flex items-center justify-center rounded-full">
-                            <Calendar className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-pink-500 flex items-center justify-center rounded-full">
+                            <Calendar className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "image" ? (
-                          <div className="w-12 h-12 bg-indigo-500 flex items-center justify-center rounded-full">
-                            <ImageIcon className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-indigo-500 flex items-center justify-center rounded-full">
+                            <ImageIcon className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "lock" ? (
-                          <div className="w-12 h-12 bg-red-500 flex items-center justify-center rounded-full">
-                            <Lock className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-red-500 flex items-center justify-center rounded-full">
+                            <Lock className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "settings" ? (
-                          <div className="w-12 h-12 bg-gray-500 flex items-center justify-center rounded-full">
-                            <Settings className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-500 flex items-center justify-center rounded-full">
+                            <Settings className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "refresh" ? (
-                          <div className="w-12 h-12 bg-blue-500 flex items-center justify-center rounded-full">
-                            <RefreshCw className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-500 flex items-center justify-center rounded-full">
+                            <RefreshCw className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "filter" ? (
-                          <div className="w-12 h-12 bg-yellow-500 flex items-center justify-center rounded-full">
-                            <Filter className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-yellow-500 flex items-center justify-center rounded-full">
+                            <Filter className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : (notification.icon === "building" || notification.type === "farm_primary_changed") ? (
-                          <div className="w-12 h-12 bg-green-600 flex items-center justify-center rounded-full">
-                            <Building2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-green-600 flex items-center justify-center rounded-full">
+                            <Building2 className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : (notification.icon === "shield" || notification.type === "security_session_revoked") ? (
-                          <div className="w-12 h-12 bg-red-600 flex items-center justify-center rounded-full">
-                            <Shield className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-red-600 flex items-center justify-center rounded-full">
+                            <Shield className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : (notification.icon === "monitor" && notification.type === "kiosk_connected") ? (
-                          <div className="w-12 h-12 bg-blue-600 flex items-center justify-center rounded-full">
-                            <MonitorDot className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-blue-600 flex items-center justify-center rounded-full">
+                            <MonitorDot className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : (notification.icon === "monitor" && notification.type === "kiosk_disconnected") ? (
-                          <div className="w-12 h-12 bg-gray-600 flex items-center justify-center rounded-full">
-                            <MonitorDot className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-600 flex items-center justify-center rounded-full">
+                            <MonitorDot className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.icon === "wifi" ? (
-                          <div className="w-12 h-12 bg-green-600 flex items-center justify-center rounded-full">
-                            <Wifi className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-green-600 flex items-center justify-center rounded-full">
+                            <Wifi className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         ) : notification.profileImage ? (
-                          <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-gray-200">
+                          <div className="relative w-10 h-10 md:w-12 md:h-12 rounded-full overflow-hidden border-2 border-gray-200">
                             <Image
                               src={notification.profileImage}
                               alt="Profile"
@@ -268,22 +274,22 @@ export default function NotificationPage() {
                             />
                           </div>
                         ) : (
-                          <div className="w-12 h-12 bg-gray-400 flex items-center justify-center rounded-full">
-                            <Bell className="w-5 h-5 text-white" strokeWidth={2.5} />
+                          <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-400 flex items-center justify-center rounded-full">
+                            <Bell className="w-4 h-4 md:w-5 md:h-5 text-white" strokeWidth={2.5} />
                           </div>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-gray-800 mb-1">{notification.message}</p>
-                        <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <p className="text-gray-800 text-sm md:text-base mb-1 break-words">{notification.message}</p>
+                        <div className="flex items-center gap-2 md:gap-3 text-xs text-gray-500">
                           <span>{formatDate(notification.createdAt)}</span>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex flex-col md:flex-row items-center gap-1 md:gap-2 flex-shrink-0">
                         {!notification.read && (
                           <button
                             onClick={() => handleMarkAsRead(notification.id)}
-                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            className="p-1.5 md:p-2 hover:bg-gray-100 rounded-lg transition-colors"
                             title="Mark as read"
                           >
                             <Check className="w-4 h-4 text-gray-600" />
@@ -291,7 +297,7 @@ export default function NotificationPage() {
                         )}
                         <button
                           onClick={() => handleDelete(notification.id)}
-                          className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-1.5 md:p-2 hover:bg-red-50 rounded-lg transition-colors"
                           title="Delete"
                         >
                           <Trash className="w-4 h-4 text-red-600" />

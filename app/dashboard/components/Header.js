@@ -375,6 +375,11 @@ export  function Header({ setSidebarOpen }) {
                                 <div className="w-12 h-12 bg-emerald-500 flex items-center justify-center rounded-full">
                                   <Check className="w-5 h-5 text-white" strokeWidth={2.5} />
                                 </div>
+                              /* Batch deleted - Trash icon */
+                              ) : notif.type === "batch_deleted" ? (
+                                <div className="w-12 h-12 bg-red-600 flex items-center justify-center rounded-full">
+                                  <Trash2 className="w-5 h-5 text-white" strokeWidth={2.5} />
+                                </div>
                               ) : notif.icon === "login" ? (
                                 <div className="w-12 h-12 bg-[#105588] flex items-center justify-center rounded-full">
                                   <LogIn className="w-5 h-5 text-white" strokeWidth={2.5} />

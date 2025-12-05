@@ -179,13 +179,13 @@ export default function SecurityPage() {
   if (showLoading) {
     return (
       <div className="min-h-screen container mx-auto text-[#1F2421] relative">
-        <div className="flex gap-6 p-4 md:p-6">
+        <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
           <div className="hidden lg:block">
             <Navbar />
           </div>
-          <div className="flex flex-1 flex-col gap-6 w-full">
+          <div className="flex flex-1 flex-col gap-4 md:gap-6 w-full min-w-0">
             <Header setSidebarOpen={setSidebarOpen} />
-            <div className="bg-white rounded-2xl border border-gray-300 p-12">
+            <div className="bg-white rounded-2xl border border-gray-300 p-8 md:p-12">
               <LoadingLogo message="Loading security settings..." size="lg" />
             </div>
           </div>
@@ -214,23 +214,37 @@ export default function SecurityPage() {
       </div>
 
       {/* MAIN */}
-      <div className="flex gap-6 p-4 md:p-6">
+      <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Navbar />
         </div>
 
-        <div className="flex flex-1 flex-col gap-6 w-full">
+        <div className="flex flex-1 flex-col gap-4 md:gap-6 w-full min-w-0">
           {/* Header */}
           <Header setSidebarOpen={setSidebarOpen} />
 
           {/* Main container */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 md:gap-6">
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                    Security
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-1">
+                    Manage your active sessions and login history
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Active Sessions */}
-            <div className="bg-white rounded-2xl border border-gray-300 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Shield className="w-6 h-6 text-[#105588]" />
-                <h2 className="text-xl font-semibold">Active Sessions</h2>
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <div className="flex items-center gap-3 mb-4 md:mb-6">
+                <Shield className="w-5 h-5 md:w-6 md:h-6 text-[#105588]" />
+                <h2 className="text-lg md:text-xl font-semibold">Active Sessions</h2>
               </div>
 
               {sessions.length === 0 ? (
@@ -297,10 +311,10 @@ export default function SecurityPage() {
             </div>
 
             {/* Login History */}
-            <div className="bg-white rounded-2xl border border-gray-300 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Clock className="w-6 h-6 text-[#105588]" />
-                <h2 className="text-xl font-semibold">Login History</h2>
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <div className="flex items-center gap-3 mb-4 md:mb-6">
+                <Clock className="w-5 h-5 md:w-6 md:h-6 text-[#105588]" />
+                <h2 className="text-lg md:text-xl font-semibold">Login History</h2>
               </div>
 
               {loginHistory.length === 0 ? (

@@ -4,13 +4,13 @@ import { Package, Weight, Clock8, Calendar } from "lucide-react";
 const getSizeTypeColor = (sizeType) => {
   switch (sizeType) {
     case "Small":
-      return "text-blue-500";
+      return "text-[#105588]";
     case "Medium":
-      return "text-green-500";
+      return "text-[#fb510f]";
     case "Large":
-      return "text-yellow-500";
+      return "text-[#ecb662]";
     case "Defect":
-      return "text-red-500";
+      return "text-[#fb510f]";
     default:
       return "text-gray-500";
   }
@@ -20,13 +20,13 @@ const getSizeTypeColor = (sizeType) => {
 const getSizeTypeBgColor = (sizeType) => {
   switch (sizeType) {
     case "Small":
-      return "bg-blue-100";
+      return "bg-[#E8F4FA]";
     case "Medium":
-      return "bg-green-100";
+      return "bg-[#FEF3EF]";
     case "Large":
-      return "bg-yellow-100";
+      return "bg-[#FDF8F0]";
     case "Defect":
-      return "bg-red-100";
+      return "bg-[#FEF3EF]";
     default:
       return "bg-gray-100";
   }
@@ -66,7 +66,7 @@ export default function InventoryOverviewCards({ overviewData, selectedBatch }) 
       {/* Main overview cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div className="flex items-center gap-3 sm:gap-4 border border-gray-300 rounded-lg p-3 sm:p-4">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-500 flex-shrink-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#E8F4FA] rounded-full flex items-center justify-center text-[#105588] flex-shrink-0">
             <Package className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="flex flex-1 flex-col gap-0.5 sm:gap-1">
@@ -78,7 +78,7 @@ export default function InventoryOverviewCards({ overviewData, selectedBatch }) 
         </div>
 
         <div className="flex items-center gap-3 sm:gap-4 border border-gray-300 rounded-lg p-3 sm:p-4">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-500 flex-shrink-0">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#E8F4FA] rounded-full flex items-center justify-center text-[#105588] flex-shrink-0">
             <Package className="w-4 h-4 sm:w-5 sm:h-5" />
           </div>
           <div className="flex flex-1 flex-col gap-0.5 sm:gap-1">

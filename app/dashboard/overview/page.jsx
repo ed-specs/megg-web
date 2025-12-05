@@ -57,6 +57,9 @@ export default function OverviewPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  
+  // Insights modal state
+  const [showInsightsModal, setShowInsightsModal] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -116,8 +119,8 @@ export default function OverviewPage() {
         });
       });
 
-      // Sort by batch name
-      batchesArray.sort((a, b) => a.name.localeCompare(b.name));
+      // Sort by creation date (oldest to newest for chronological order)
+      batchesArray.sort((a, b) => a.createdAt - b.createdAt);
 
       console.log('[Overview] Processed batches:', batchesArray.length);
       setRawBatchesData(batchesArray);
@@ -214,9 +217,10 @@ export default function OverviewPage() {
     setDateTo("");
   };
 
-  // Prepare chart data (chronological order for charts)
+  // Prepare chart data (oldest to newest for charts)
   const chartData = useMemo(() => {
-    return batchesData.slice().reverse();
+    // batchesData is already sorted newest first, so reverse it for chronological order
+    return batchesData.slice();
   }, [batchesData]);
 
   // Generate Smart Insights
@@ -368,46 +372,69 @@ export default function OverviewPage() {
       </div>
 
       {/* MAIN */}
-      <div className="flex gap-6 p-4 md:p-6">
+      <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Navbar />
         </div>
 
-        <div className="flex flex-1 flex-col gap-6 w-full">
+        <div className="flex flex-1 flex-col gap-4 md:gap-6 w-full min-w-0">
           {/* Header */}
           <Header setSidebarOpen={setSidebarOpen} />
 
           {/* Main Content */}
-          <div className="flex flex-col gap-6">
-            {/* Title, Filter, and Refresh */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h1 className="text-xl md:text-2xl font-bold text-gray-800">Overview Dashboard</h1>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center gap-2 px-3 md:px-4 py-2 border rounded-lg transition-colors ${
-                    hasActiveFilters 
-                      ? 'bg-blue-50 border-blue-300 text-blue-600' 
-                      : 'bg-white border-gray-300 hover:bg-gray-50'
-                  }`}
-                >
-                  <Filter className="w-4 h-4" />
-                  <span className="text-xs md:text-sm font-medium">Filter</span>
-                  {hasActiveFilters && (
-                    <span className="px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
-                      {(dateFrom ? 1 : 0) + (dateTo ? 1 : 0)}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={refreshData}
-                  disabled={isRefreshing}
-                  className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <span className="text-xs md:text-sm font-medium hidden sm:inline">Refresh</span>
-                </button>
+          <div className="flex flex-col gap-4 md:gap-6">
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                    Overview Dashboard
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-1">
+                    Track performance metrics and analyze egg processing data
+                  </p>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setShowInsightsModal(true)}
+                    className="flex items-center gap-2 px-3 md:px-4 py-2 bg-[#105588] text-white rounded-lg hover:bg-[#0d4470] transition-colors focus:outline-none focus:ring-2 focus:ring-[#105588]"
+                  >
+                    <Lightbulb className="w-4 md:w-5 h-4 md:h-5" />
+                    <span className="text-sm hidden sm:inline">Insights</span>
+                    {insights.length > 0 && (
+                      <span className="px-1.5 py-0.5 bg-white text-[#105588] text-xs rounded-full font-medium">
+                        {insights.length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-2 px-3 md:px-4 py-2 border rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                      hasActiveFilters 
+                        ? 'bg-blue-50 border-blue-300 text-blue-600' 
+                        : 'bg-white border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Filter className="w-4 md:w-5 h-4 md:h-5" />
+                    <span className="text-sm hidden sm:inline">Filter</span>
+                    {hasActiveFilters && (
+                      <span className="px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                        {(dateFrom ? 1 : 0) + (dateTo ? 1 : 0)}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={refreshData}
+                    disabled={isRefreshing}
+                    className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <RefreshCw className={`w-4 md:w-5 h-4 md:h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span className="text-sm hidden sm:inline">Refresh</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -457,11 +484,11 @@ export default function OverviewPage() {
             )}
 
             {loading ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-12">
+              <div className="bg-white border border-gray-200 rounded-xl p-6 md:p-12">
                 <LoadingLogo message="Loading overview data..." />
               </div>
             ) : error ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-12">
+              <div className="bg-white border border-gray-200 rounded-xl p-6 md:p-12">
                 <div className="flex flex-col items-center justify-center gap-4">
                   <div className="text-red-600 text-lg font-medium">⚠️ {error}</div>
                   <button
@@ -473,7 +500,7 @@ export default function OverviewPage() {
                 </div>
               </div>
             ) : !hasData ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-12">
+              <div className="bg-white border border-gray-200 rounded-xl p-6 md:p-12">
                 <div className="flex flex-col items-center justify-center gap-2">
                   <div className="text-gray-400 text-lg font-medium">No data available</div>
                   <div className="text-gray-500 text-sm">Start processing eggs to see statistics</div>
@@ -484,57 +511,57 @@ export default function OverviewPage() {
                 {/* Performance Metrics Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                   {/* Total Eggs */}
-                  <div className="bg-gradient-to-br from-purple-50 to-white border border-purple-200 rounded-xl p-4 md:p-6 hover:shadow-lg transition-all">
+                  <div className="bg-white border border-gray-300 rounded-xl p-4 md:p-6 hover:shadow-lg transition-all">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="text-xs md:text-sm font-medium text-purple-600 mb-1">Total Eggs Processed</p>
-                        <p className="text-2xl md:text-3xl font-bold text-gray-900">{stats.totalEggs.toLocaleString()}</p>
+                        <p className="text-xs md:text-sm font-medium text-gray-600 mb-1">Total Eggs Processed</p>
+                        <p className="text-2xl md:text-3xl font-bold text-[#105588]">{stats.totalEggs.toLocaleString()}</p>
                         <p className="text-xs text-gray-500 mt-1">{performanceMetrics.totalBatches} batches</p>
                       </div>
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                        <Package className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-[#E8F4FA] flex items-center justify-center flex-shrink-0">
+                        <Package className="w-5 h-5 md:w-6 md:h-6 text-[#105588]" />
                       </div>
                     </div>
                   </div>
 
                   {/* Quality Score */}
-                  <div className="bg-gradient-to-br from-green-50 to-white border border-green-200 rounded-xl p-4 md:p-6 hover:shadow-lg transition-all">
+                  <div className="bg-white border border-gray-300 rounded-xl p-4 md:p-6 hover:shadow-lg transition-all">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="text-xs md:text-sm font-medium text-green-600 mb-1">Quality Score</p>
-                        <p className="text-2xl md:text-3xl font-bold text-gray-900">{qualityScore}%</p>
+                        <p className="text-xs md:text-sm font-medium text-gray-600 mb-1">Quality Score</p>
+                        <p className="text-2xl md:text-3xl font-bold text-[#fb510f]">{qualityScore}%</p>
                         <p className="text-xs text-gray-500 mt-1">{stats.goodEggs.toLocaleString()} good</p>
                       </div>
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
-                        <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" />
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-[#FEF3EF] flex items-center justify-center flex-shrink-0">
+                        <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-[#fb510f]" />
                       </div>
                     </div>
                   </div>
 
                   {/* Processing Speed */}
-                  <div className="bg-gradient-to-br from-blue-50 to-white border border-blue-200 rounded-xl p-4 md:p-6 hover:shadow-lg transition-all">
+                  <div className="bg-white border border-gray-300 rounded-xl p-4 md:p-6 hover:shadow-lg transition-all">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="text-xs md:text-sm font-medium text-blue-600 mb-1">Processing Speed</p>
-                        <p className="text-2xl md:text-3xl font-bold text-gray-900">{Math.round(performanceMetrics.avgEggsPerHour)}</p>
+                        <p className="text-xs md:text-sm font-medium text-gray-600 mb-1">Processing Speed</p>
+                        <p className="text-2xl md:text-3xl font-bold text-[#105588]">{Math.round(performanceMetrics.avgEggsPerHour)}</p>
                         <p className="text-xs text-gray-500 mt-1">eggs/hour</p>
                       </div>
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                        <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-[#E8F4FA] flex items-center justify-center flex-shrink-0">
+                        <TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-[#105588]" />
                       </div>
                     </div>
                   </div>
 
                   {/* Avg Batch Time */}
-                  <div className="bg-gradient-to-br from-orange-50 to-white border border-orange-200 rounded-xl p-4 md:p-6 hover:shadow-lg transition-all">
+                  <div className="bg-white border border-gray-300 rounded-xl p-4 md:p-6 hover:shadow-lg transition-all">
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="text-xs md:text-sm font-medium text-orange-600 mb-1">Avg Batch Time</p>
-                        <p className="text-2xl md:text-3xl font-bold text-gray-900">{formatTime(performanceMetrics.avgProcessingTime)}</p>
+                        <p className="text-xs md:text-sm font-medium text-gray-600 mb-1">Avg Batch Time</p>
+                        <p className="text-2xl md:text-3xl font-bold text-[#ecb662]">{formatTime(performanceMetrics.avgProcessingTime)}</p>
                         <p className="text-xs text-gray-500 mt-1">{Math.round(performanceMetrics.avgEggsPerBatch)} eggs/batch</p>
                       </div>
-                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-orange-100 flex items-center justify-center flex-shrink-0">
-                        <RefreshCw className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-[#FDF8F0] flex items-center justify-center flex-shrink-0">
+                        <RefreshCw className="w-5 h-5 md:w-6 md:h-6 text-[#ecb662]" />
                       </div>
                     </div>
                   </div>
@@ -548,9 +575,9 @@ export default function OverviewPage() {
                     <ResponsiveContainer width="100%" height={280}>
                       <BarChart 
                         data={[
-                          { name: 'Small', value: stats.smallEggs, fill: '#3B82F6' },
-                          { name: 'Medium', value: stats.mediumEggs, fill: '#10B981' },
-                          { name: 'Large', value: stats.largeEggs, fill: '#F59E0B' },
+                          { name: 'Small', value: stats.smallEggs, fill: '#105588' },
+                          { name: 'Medium', value: stats.mediumEggs, fill: '#fb510f' },
+                          { name: 'Large', value: stats.largeEggs, fill: '#ecb662' },
                         ]}
                         margin={{ top: 20, right: 20, left: -10, bottom: 5 }}
                       >
@@ -587,9 +614,9 @@ export default function OverviewPage() {
                     <ResponsiveContainer width="100%" height={280}>
                       <BarChart 
                         data={[
-                          { name: 'Good', value: stats.goodEggs, fill: '#10B981' },
-                          { name: 'Dirty', value: stats.dirtyEggs, fill: '#F59E0B' },
-                          { name: 'Cracked', value: stats.crackEggs, fill: '#EF4444' },
+                          { name: 'Good', value: stats.goodEggs, fill: '#105588' },
+                          { name: 'Dirty', value: stats.dirtyEggs, fill: '#ecb662' },
+                          { name: 'Cracked', value: stats.crackEggs, fill: '#fb510f' },
                         ]}
                         margin={{ top: 20, right: 20, left: -10, bottom: 5 }}
                       >
@@ -632,16 +659,16 @@ export default function OverviewPage() {
                           <AreaChart data={chartData} margin={{ top: 10, right: 5, left: -20, bottom: 5 }}>
                             <defs>
                               <linearGradient id="colorSmall" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0.05}/>
+                                <stop offset="5%" stopColor="#105588" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#105588" stopOpacity={0.05}/>
                               </linearGradient>
                               <linearGradient id="colorMedium" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#10B981" stopOpacity={0.05}/>
+                                <stop offset="5%" stopColor="#fb510f" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#fb510f" stopOpacity={0.05}/>
                               </linearGradient>
                               <linearGradient id="colorLarge" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#F59E0B" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#F59E0B" stopOpacity={0.05}/>
+                                <stop offset="5%" stopColor="#ecb662" stopOpacity={0.3}/>
+                                <stop offset="95%" stopColor="#ecb662" stopOpacity={0.05}/>
                               </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
@@ -668,9 +695,9 @@ export default function OverviewPage() {
                               }}
                             />
                             <Legend wrapperStyle={{ paddingTop: '8px', fontSize: '12px' }} />
-                            <Area type="monotone" dataKey="small" stroke="#3B82F6" strokeWidth={2} fill="url(#colorSmall)" name="Small" />
-                            <Area type="monotone" dataKey="medium" stroke="#10B981" strokeWidth={2} fill="url(#colorMedium)" name="Medium" />
-                            <Area type="monotone" dataKey="large" stroke="#F59E0B" strokeWidth={2} fill="url(#colorLarge)" name="Large" />
+                            <Area type="monotone" dataKey="small" stroke="#105588" strokeWidth={2} fill="url(#colorSmall)" name="Small" />
+                            <Area type="monotone" dataKey="medium" stroke="#fb510f" strokeWidth={2} fill="url(#colorMedium)" name="Medium" />
+                            <Area type="monotone" dataKey="large" stroke="#ecb662" strokeWidth={2} fill="url(#colorLarge)" name="Large" />
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
@@ -744,7 +771,7 @@ export default function OverviewPage() {
                               }}
                               formatter={(value) => [`${Math.round(value)} min`, 'Time']}
                             />
-                            <Bar dataKey="processingTime" fill="#F59E0B" radius={[8, 8, 0, 0]} name="Processing Time" />
+                            <Bar dataKey="processingTime" fill="#fb510f" radius={[8, 8, 0, 0]} name="Processing Time" />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -752,41 +779,87 @@ export default function OverviewPage() {
                   </>
                 )}
 
-                {/* Smart Insights - At Bottom */}
-                {insights.length > 0 && (
-                  <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-xl p-4 md:p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Lightbulb className="w-5 h-5 text-blue-600" />
-                      <h2 className="text-base md:text-lg font-semibold text-gray-800">Smart Insights</h2>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {insights.map((insight, index) => {
-                        const Icon = insight.icon;
-                        const bgColors = {
-                          success: 'bg-green-50 border-green-200',
-                          warning: 'bg-yellow-50 border-yellow-200',
-                          error: 'bg-red-50 border-red-200',
-                          info: 'bg-blue-50 border-blue-200'
-                        };
-                        const iconColors = {
-                          success: 'text-green-600',
-                          warning: 'text-yellow-600',
-                          error: 'text-red-600',
-                          info: 'text-blue-600'
-                        };
-                        
-                        return (
-                          <div
-                            key={index}
-                            className={`flex items-start gap-3 p-4 rounded-lg border ${bgColors[insight.type]}`}
-                          >
-                            <div className="flex-shrink-0 mt-0.5">
-                              <Icon className={`w-5 h-5 ${iconColors[insight.type]}`} />
+                {/* Smart Insights Modal */}
+                {showInsightsModal && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
+                    {/* Backdrop */}
+                    <div 
+                      className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                      onClick={() => setShowInsightsModal(false)}
+                    />
+                    
+                    {/* Modal Content */}
+                    <div className="relative bg-white rounded-xl sm:rounded-2xl shadow-2xl max-w-3xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-hidden border border-gray-300">
+                      {/* Modal Header */}
+                      <div className="bg-white border-b border-gray-200 p-4 sm:p-6">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-[#E8F4FA] rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Lightbulb className="w-4 h-4 sm:w-6 sm:h-6 text-[#105588]" />
                             </div>
-                            <p className="text-sm text-gray-700 leading-relaxed">{insight.message}</p>
+                            <div className="min-w-0">
+                              <h2 className="text-lg sm:text-xl font-bold text-gray-900 truncate">Smart Insights</h2>
+                              <p className="text-gray-600 text-xs sm:text-sm hidden sm:block">AI-powered recommendations</p>
+                            </div>
                           </div>
-                        );
-                      })}
+                          <button
+                            onClick={() => setShowInsightsModal(false)}
+                            className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                          >
+                            <X className="w-5 h-5 text-gray-600" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Modal Body */}
+                      <div className="p-3 sm:p-6 overflow-y-auto max-h-[calc(95vh-140px)] sm:max-h-[calc(90vh-120px)]">
+                        {insights.length > 0 ? (
+                          <div className="grid grid-cols-1 gap-3 sm:gap-4">
+                            {insights.map((insight, index) => {
+                              const Icon = insight.icon;
+                              const bgColors = {
+                                success: 'bg-[#E8F4FA] border-[#105588]/30',
+                                warning: 'bg-[#FDF8F0] border-[#ecb662]/30',
+                                error: 'bg-[#FEF3EF] border-[#fb510f]/30',
+                                info: 'bg-[#E8F4FA] border-[#105588]/30'
+                              };
+                              const iconColors = {
+                                success: 'text-[#105588]',
+                                warning: 'text-[#ecb662]',
+                                error: 'text-[#fb510f]',
+                                info: 'text-[#105588]'
+                              };
+                              
+                              return (
+                                <div
+                                  key={index}
+                                  className={`flex items-start gap-3 sm:gap-4 p-3 sm:p-5 rounded-lg border ${bgColors[insight.type]} hover:shadow-md transition-shadow`}
+                                >
+                                  <div className="flex-shrink-0 mt-0.5 sm:mt-1">
+                                    <Icon className={`w-5 h-5 sm:w-6 sm:h-6 ${iconColors[insight.type]}`} />
+                                  </div>
+                                  <p className="text-sm sm:text-base text-gray-800 leading-relaxed">{insight.message}</p>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-8 sm:py-12">
+                            <Lightbulb className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 text-gray-300" />
+                            <p className="text-gray-500 text-sm sm:text-base px-4">No insights available yet. Process more batches to see recommendations.</p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Modal Footer */}
+                      <div className="border-t border-gray-200 p-3 sm:p-4 bg-gray-50">
+                        <button
+                          onClick={() => setShowInsightsModal(false)}
+                          className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm sm:text-base"
+                        >
+                          Close
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}

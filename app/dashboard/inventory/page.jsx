@@ -3,7 +3,7 @@
 import { Navbar } from "../components/NavBar";
 import { Header } from "../components/Header";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { RefreshCw, Download, Package, Egg, AlertTriangle, CheckCircle, GitCompare, TrendingUp } from "lucide-react";
+import { RefreshCw, Download, Package, Egg, AlertTriangle, CheckCircle, GitCompare, TrendingUp, X, Trash2 } from "lucide-react";
 import LoadingLogo from "../components/LoadingLogo";
 import ResultModal from "../components/ResultModal";
 import { useLoadingDelay } from "../components/useLoadingDelay";
@@ -13,6 +13,8 @@ import { isValidBatch, safeGet, safeFormatNumber, safePercentage, safeFormatDate
 import { saveInAppNotification } from "../../utils/notification-utils";
 
 import { getMachineLinkedInventoryData, getMachineLinkedBatchDetails, updateBatchStatus } from "../../lib/inventory/InventoryData";
+import { db } from "../../config/firebaseConfig";
+import { doc, deleteDoc, collection, query, where, getDocs } from "firebase/firestore";
 import QRCode from 'qrcode';
 
 // Import our new components
@@ -79,6 +81,11 @@ export default function InventoryPage() {
   const [compareBatches, setCompareBatches] = useState([]);
   const [showComparisonSelectionModal, setShowComparisonSelectionModal] = useState(false);
   const [showComparisonModal, setShowComparisonModal] = useState(false);
+  
+  // Delete batch state
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
   const [comparisonOverviewData, setComparisonOverviewData] = useState({});
 
   // Restore filters from localStorage on mount
@@ -413,52 +420,56 @@ export default function InventoryPage() {
     }
   }, []);
 
-  // Handle batch status toggle (memoized)
-  const handleStatusToggle = useCallback(async () => {
-    if (!selectedBatch || !overviewData) return;
+  // Handle batch deletion (memoized)
+  const handleDeleteBatch = useCallback(async () => {
+    if (!selectedBatch || deleteConfirmText !== selectedBatch) {
+      setResultMessage("Please type the batch number exactly to confirm deletion.");
+      return;
+    }
 
     try {
-      setUpdatingStatus(true);
-      const currentStatus = (overviewData.status || "active").toLowerCase();
-      const newStatus = currentStatus === "active" ? "not active" : "active";
+      setIsDeleting(true);
       
-      const success = await updateBatchStatus(selectedBatch, newStatus);
+      // Delete batch from Firestore
+      const batchRef = doc(db, "batches", selectedBatch);
+      await deleteDoc(batchRef);
       
-      if (success) {
-        // Update local state
-        setOverviewData({
-          ...overviewData,
-          status: newStatus,
-        });
-
-        // Refresh the batch list to reflect status change
-        const inventoryData = await getMachineLinkedInventoryData();
-        const validBatches = inventoryData.filter(isValidBatch);
-        setBatchReviews(validBatches);
-        
-        setResultMessage(`Batch status updated to ${newStatus} successfully!`);
-        await saveInAppNotification(
-          `Batch ${selectedBatch} status changed to ${newStatus}.`,
-          'batch_status_updated'
-        );
-      } else {
-        setResultMessage("Failed to update batch status. Please try again.");
-        await saveInAppNotification(
-          'Could not update batch status. Please try again.',
-          'batch_status_update_failed'
-        );
-      }
-    } catch (error) {
-      devError("Error updating batch status:", error);
-      setResultMessage("Failed to update batch status. Please try again.");
+      // Delete all eggs related to this batch
+      const eggsRef = collection(db, "eggs");
+      const eggsQuery = query(eggsRef, where("batchId", "==", selectedBatch));
+      const eggsSnapshot = await getDocs(eggsQuery);
+      
+      const deletePromises = eggsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      
+      // Show success message
+      setResultMessage(`Batch ${selectedBatch} and ${eggsSnapshot.size} related eggs deleted successfully!`);
       await saveInAppNotification(
-        'An error occurred while updating batch status.',
-        'batch_status_update_failed'
+        `Batch ${selectedBatch} and ${eggsSnapshot.size} eggs permanently deleted.`,
+        'batch_deleted'
+      );
+      
+      // Refresh the batch list
+      const inventoryData = await getMachineLinkedInventoryData();
+      const validBatches = inventoryData.filter(isValidBatch);
+      setBatchReviews(validBatches);
+      
+      // Close modal and reset
+      setShowDeleteConfirmModal(false);
+      setDeleteConfirmText("");
+      setSelectedBatch(null);
+      
+    } catch (error) {
+      devError("Error deleting batch:", error);
+      setResultMessage("Failed to delete batch. Please try again.");
+      await saveInAppNotification(
+        `Failed to delete batch ${selectedBatch}.`,
+        'batch_delete_failed'
       );
     } finally {
-      setUpdatingStatus(false);
+      setIsDeleting(false);
     }
-  }, [selectedBatch, overviewData]);
+  }, [selectedBatch, deleteConfirmText]);
 
   // Reset pagination and clear selections when filters change
   useEffect(() => {
@@ -677,6 +688,58 @@ export default function InventoryPage() {
 
           {/* Main container */}
           <div className="flex flex-col gap-4 sm:gap-6">
+            {/* Header Card - Only show when NOT viewing batch details */}
+            {!selectedBatch && !showLoading && (
+              <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                  <div className="min-w-0">
+                    <h2 className="text-xl md:text-2xl font-bold text-gray-900">Inventory Batches</h2>
+                    <p className="text-gray-600 text-sm mt-1">
+                      {filteredAndSortedBatches.length === batchReviews.length
+                        ? `Manage and export ${batchReviews.length} batch${batchReviews.length !== 1 ? 'es' : ''}`
+                        : `Showing ${filteredAndSortedBatches.length} of ${batchReviews.length} batches`}
+                    </p>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {/* Analytics Button */}
+                    <button
+                      onClick={() => setShowInsights(true)}
+                      className="flex items-center gap-2 px-3 md:px-4 py-2 bg-[#105588] text-white rounded-lg hover:bg-[#0d4470] transition-colors focus:outline-none focus:ring-2 focus:ring-[#105588]"
+                    >
+                      <TrendingUp className="w-4 md:w-5 h-4 md:h-5" />
+                      <span className="text-sm hidden sm:inline">Analytics</span>
+                    </button>
+                    {/* Export Button */}
+                    {filteredAndSortedBatches.length > 0 && (
+                      <button
+                        onClick={() => setShowBatchSelectionModal(true)}
+                        disabled={isExporting}
+                        className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <Download className="w-4 md:w-5 h-4 md:h-5" />
+                        <span className="text-sm hidden sm:inline">{isExporting ? 'Exporting...' : 'Export'}</span>
+                        {selectedBatches.length > 0 && (
+                          <span className="px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full font-medium">
+                            {selectedBatches.length}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={refreshData}
+                      disabled={isRefreshing}
+                      className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <RefreshCw className={`w-4 md:w-5 h-4 md:h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      <span className="text-sm hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* batch review display */}
             <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-300 p-3 sm:p-4 md:p-6">
               {showLoading ? (
@@ -745,57 +808,27 @@ export default function InventoryPage() {
                           </button>
                           
                           {showExportDropdown && (
-                            <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
+                            <div className="absolute left-0 sm:right-0 sm:left-auto mt-2 w-44 sm:w-48 bg-white border border-gray-300 rounded-lg shadow-lg z-50">
                               <button
                                 onClick={() => {
                                   handleExportBatchDetails('pdf');
                                   setShowExportDropdown(false);
                                 }}
-                                className="w-full text-left px-3 sm:px-4 py-2 hover:bg-gray-50 first:rounded-t-lg text-xs sm:text-sm"
+                                className="w-full text-left px-3 sm:px-4 py-2 hover:bg-gray-50 rounded-lg text-xs sm:text-sm"
                               >
                                 Export as PDF
-                              </button>
-                              <button
-                                onClick={() => {
-                                  handleExportBatchDetails('image');
-                                  setShowExportDropdown(false);
-                                }}
-                                className="w-full text-left px-3 sm:px-4 py-2 hover:bg-gray-50 last:rounded-b-lg text-xs sm:text-sm"
-                              >
-                                Export as Image
                               </button>
                             </div>
                           )}
                         </div>
-                        {/* Status Toggle Button */}
+                        {/* Remove Batch Button */}
                         <button
-                          onClick={handleStatusToggle}
-                          disabled={updatingStatus}
-                          className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg transition-colors duration-150 text-xs sm:text-sm font-medium whitespace-nowrap ${
-                            (overviewData?.status || "active").toLowerCase() === "active"
-                              ? "bg-yellow-100 text-yellow-700 hover:bg-yellow-200"
-                              : "bg-green-100 text-green-700 hover:bg-green-200"
-                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                          onClick={() => setShowDeleteConfirmModal(true)}
+                          className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors duration-150 text-xs sm:text-sm font-medium whitespace-nowrap"
                         >
-                          {updatingStatus ? (
-                            <>
-                              <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
-                              <span className="hidden xs:inline">Updating...</span>
-                            </>
-                          ) : (
-                            <>
-                              <span className="hidden sm:inline">
-                                {(overviewData?.status || "active").toLowerCase() === "active"
-                                  ? "Set Not Active"
-                                  : "Set Active"}
-                              </span>
-                              <span className="sm:hidden">
-                                {(overviewData?.status || "active").toLowerCase() === "active"
-                                  ? "Deactivate"
-                                  : "Activate"}
-                              </span>
-                            </>
-                          )}
+                          <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                          <span className="hidden sm:inline">Remove Batch</span>
+                          <span className="sm:hidden">Remove</span>
                         </button>
                       </div>
                     </div>
@@ -822,43 +855,6 @@ export default function InventoryPage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-4 sm:gap-6">
-                  {/* Header with refresh and export buttons */}
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-                    <div className="min-w-0">
-                      <h2 className="text-lg sm:text-xl font-semibold truncate">Inventory Batches</h2>
-                      <p className="text-gray-500 text-xs sm:text-sm">
-                        {filteredAndSortedBatches.length === batchReviews.length
-                          ? `Showing ${batchReviews.length} batch${batchReviews.length !== 1 ? 'es' : ''}`
-                          : `Showing ${filteredAndSortedBatches.length} of ${batchReviews.length} batches`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 sm:gap-2">
-                      {/* Export Button */}
-                      {filteredAndSortedBatches.length > 0 && (
-                        <button
-                          onClick={() => setShowBatchSelectionModal(true)}
-                          disabled={isExporting}
-                          className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 text-xs sm:text-sm font-medium"
-                        >
-                          <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          <span className="hidden xs:inline">{isExporting ? 'Exporting...' : 'Export'}</span>
-                          {selectedBatches.length > 0 && (
-                            <span className="bg-white text-blue-500 rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center text-xs font-semibold">
-                              {selectedBatches.length}
-                            </span>
-                          )}
-                        </button>
-                      )}
-                      <button
-                        onClick={refreshData}
-                        disabled={isRefreshing}
-                        className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150 text-xs sm:text-sm font-medium"
-                      >
-                        <RefreshCw className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        <span className="hidden xs:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
-                      </button>
-                    </div>
-                  </div>
 
                   {/* Search and Filter Component */}
                   <InventorySearchAndFilter
@@ -882,64 +878,6 @@ export default function InventoryPage() {
                     setSizeFilters={setSizeFilters}
                     onClearFilters={clearFilters}
                   />
-
-                  {/* Quick Stats Dashboard */}
-                  <div className="space-y-4 sm:space-y-6">
-                    {/* Toggle Insights Button */}
-                    <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-2 sm:gap-3">
-                      <button
-                        onClick={() => setShowInsights(!showInsights)}
-                        className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                      >
-                        <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        {showInsights ? 'Hide' : 'Show'} Analytics & Insights
-                      </button>
-                      
-                      {/* Batch Comparison Button */}
-                      <button
-                        onClick={() => setShowComparisonSelectionModal(true)}
-                        className="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-xs sm:text-sm font-medium"
-                      >
-                        <GitCompare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span>Compare Batches</span>
-                      </button>
-                    </div>
-
-                    {showInsights && (
-                      <>
-                        {/* Stats Cards */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                          <StatCard
-                            title="Total Batches"
-                            value={quickStats.totalBatches}
-                            icon={Package}
-                            color="blue"
-                          />
-                          <StatCard
-                            title="Total Eggs"
-                            value={quickStats.totalEggs}
-                            icon={Egg}
-                            color="purple"
-                          />
-                          <StatCard
-                            title="Avg Defect Rate"
-                            value={`${quickStats.avgDefectRate}%`}
-                            icon={AlertTriangle}
-                            color="red"
-                          />
-                          <StatCard
-                            title="Active Batches"
-                            value={quickStats.activeBatches}
-                            icon={CheckCircle}
-                            color="green"
-                          />
-                        </div>
-
-                        {/* Trends Charts */}
-                        <TrendsChart batches={filteredAndSortedBatches} />
-                      </>
-                    )}
-                  </div>
 
                   {/* Batch Grid */}
                   <InventoryBatchGrid 
@@ -1000,6 +938,183 @@ export default function InventoryPage() {
           onClose={() => setShowComparisonModal(false)}
           overviewDataMap={comparisonOverviewData}
         />
+      )}
+
+      {/* Analytics Modal */}
+      {showInsights && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowInsights(false)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-hidden border border-gray-300">
+            {/* Modal Header */}
+            <div className="bg-white border-b border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[#E8F4FA] rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-[#105588]" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Analytics & Insights</h2>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowInsights(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-180px)]">
+              <div className="space-y-4 sm:space-y-6">
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <StatCard
+                    title="Total Batches"
+                    value={quickStats.totalBatches}
+                    icon={Package}
+                    color="blue"
+                  />
+                  <StatCard
+                    title="Total Eggs"
+                    value={quickStats.totalEggs}
+                    icon={Egg}
+                    color="purple"
+                  />
+                  <StatCard
+                    title="Avg Defect Rate"
+                    value={`${quickStats.avgDefectRate}%`}
+                    icon={AlertTriangle}
+                    color="red"
+                  />
+                  <StatCard
+                    title="Active Batches"
+                    value={quickStats.activeBatches}
+                    icon={CheckCircle}
+                    color="green"
+                  />
+                </div>
+
+                {/* Trends Charts */}
+                <TrendsChart batches={filteredAndSortedBatches} />
+
+                {/* Batch Comparison Button */}
+                <button
+                  onClick={() => {
+                    setShowInsights(false);
+                    setShowComparisonSelectionModal(true);
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 sm:py-3 bg-[#105588] text-white rounded-lg hover:bg-[#0d4470] transition-colors font-medium text-sm sm:text-base"
+                >
+                  <GitCompare className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span>Compare Batches</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 p-3 sm:p-4 bg-gray-50">
+              <button
+                onClick={() => setShowInsights(false)}
+                className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium text-sm sm:text-base"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => !isDeleting && setShowDeleteConfirmModal(false)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-300">
+            {/* Modal Header */}
+            <div className="bg-red-50 border-b border-red-200 p-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Delete Batch</h2>
+                  <p className="text-red-600 text-sm">This action cannot be undone</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <div className="space-y-4">
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800 font-medium mb-2">
+                    ⚠️ Warning: This will permanently delete:
+                  </p>
+                  <ul className="text-sm text-yellow-700 space-y-1 ml-4 list-disc">
+                    <li>The batch: <strong>{selectedBatch}</strong></li>
+                    <li>All eggs associated with this batch</li>
+                    <li>All related statistics and history</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Type <span className="font-bold text-red-600">{selectedBatch}</span> to confirm:
+                  </label>
+                  <input
+                    type="text"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder={selectedBatch}
+                    disabled={isDeleting}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 disabled:bg-gray-100 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 p-4 bg-gray-50 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirmModal(false);
+                  setDeleteConfirmText("");
+                }}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteBatch}
+                disabled={isDeleting || deleteConfirmText !== selectedBatch}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Deleting...
+                  </span>
+                ) : (
+                  "Delete Permanently"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Batch Comparison Selection Modal */}

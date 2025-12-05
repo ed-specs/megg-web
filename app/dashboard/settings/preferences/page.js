@@ -406,7 +406,7 @@ export default function NotificationSettings() {
       </div>
 
       {/* MAIN */}
-      <div className="flex gap-6 p-4 md:p-6">
+      <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Navbar />
@@ -417,10 +417,24 @@ export default function NotificationSettings() {
           <Header setSidebarOpen={setSidebarOpen} />
 
           {/* Main container */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 md:gap-6">
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                    Notification Preferences
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-1">
+                    Customize how you receive notifications
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* General Notification Settings */}
-            <div className="bg-white rounded-2xl border border-gray-300 p-6">
-              <h2 className="text-xl font-semibold mb-6">Notification Preferences</h2>
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <h2 className="text-lg md:text-xl font-semibold mb-4 md:mb-6">General Settings</h2>
               
               <div className="space-y-6">
 

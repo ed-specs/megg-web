@@ -223,7 +223,7 @@ export default function ProfilePage() {
         </div>
 
         {/* MAIN */}
-        <div className="flex gap-6 p-4 md:p-6">
+        <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
           {/* Desktop Sidebar */}
           <div className="hidden lg:block">
             <Navbar />
@@ -234,7 +234,7 @@ export default function ProfilePage() {
             <Header setSidebarOpen={setSidebarOpen} />
 
             {/* Loading Logo */}
-            <div className="bg-white rounded-2xl border border-gray-300 p-12">
+            <div className="bg-white rounded-2xl border border-gray-300 p-8 md:p-12">
               <LoadingLogo message="Loading profile..." size="lg" />
             </div>
           </div>
@@ -263,18 +263,32 @@ export default function ProfilePage() {
       </div>
 
       {/* MAIN */}
-      <div className="flex gap-6 p-4 md:p-6">
+      <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
         {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <Navbar />
         </div>
 
-        <div className="flex flex-1 flex-col gap-6 w-full">
+        <div className="flex flex-1 flex-col gap-4 md:gap-6 w-full min-w-0">
           {/* Header */}
           <Header setSidebarOpen={setSidebarOpen} />
 
           {/* Main container */}
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 md:gap-6">
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+                <div className="min-w-0">
+                  <h1 className="text-xl md:text-2xl font-bold text-gray-900">
+                    Profile
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-1">
+                    View and manage your account information
+                  </p>
+                </div>
+              </div>
+            </div>
+            
             {/* Profile Card */}
             <ProfileCard userData={userData} />
           </div>

@@ -110,7 +110,7 @@ export default function InventoryBatchGrid({
                   {batch.totalEggs.toLocaleString()} eggs total
                 </p>
               </div>
-              <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
+              <div className="w-10 h-10 bg-[#E8F4FA] rounded-full flex items-center justify-center text-[#105588]">
                 <Package className="w-5 h-5" />
               </div>
             </div>
@@ -118,27 +118,27 @@ export default function InventoryBatchGrid({
             {/* Stats Grid - 2x2 */}
             <div className="grid grid-cols-2 gap-2">
               {/* Good */}
-              <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <div className="bg-[#E8F4FA] border border-[#105588]/30 rounded-lg p-3">
                 <div className="text-xs text-gray-600 mb-1">Good</div>
-                <div className="text-xl font-bold text-green-600">{batch.goodEggs || 0}</div>
+                <div className="text-xl font-bold text-[#105588]">{batch.goodEggs || 0}</div>
               </div>
 
               {/* Quality */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="bg-[#E8F4FA] border border-[#105588]/30 rounded-lg p-3">
                 <div className="text-xs text-gray-600 mb-1">Quality</div>
-                <div className="text-xl font-bold text-blue-600">{qualityPercent}%</div>
+                <div className="text-xl font-bold text-[#105588]">{qualityPercent}%</div>
               </div>
 
               {/* Time */}
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+              <div className="bg-[#FEF3EF] border border-[#fb510f]/30 rounded-lg p-3">
                 <div className="text-xs text-gray-600 mb-1">Time</div>
-                <div className="text-sm font-bold text-orange-600">{timeRange}</div>
+                <div className="text-sm font-bold text-[#fb510f]">{timeRange}</div>
               </div>
 
               {/* Speed */}
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+              <div className="bg-[#FDF8F0] border border-[#ecb662]/30 rounded-lg p-3">
                 <div className="text-xs text-gray-600 mb-1">Speed</div>
-                <div className="text-sm font-bold text-purple-600">{speed}/hr</div>
+                <div className="text-sm font-bold text-[#ecb662]">{speed}/hr</div>
               </div>
             </div>
 
@@ -146,7 +146,7 @@ export default function InventoryBatchGrid({
             {defects.count > 0 && (
               <div className="flex items-center justify-between text-xs pt-2 border-t border-gray-200">
                 <span className="text-gray-600">Defects:</span>
-                <span className="px-2 py-1 bg-red-100 text-red-700 rounded-full font-medium">
+                <span className="px-2 py-1 bg-[#FEF3EF] text-[#fb510f] rounded-full font-medium border border-[#fb510f]/30">
                   {defects.count} ({defects.percent}%)
                 </span>
               </div>
