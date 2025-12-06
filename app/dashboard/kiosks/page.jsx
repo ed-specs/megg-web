@@ -108,6 +108,15 @@ export default function KiosksPage() {
 
           {/* Main container */}
           <div className="flex flex-col gap-4 sm:gap-6">
+            {/* Loading State */}
+            {showLoading ? (
+              <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-300 p-3 sm:p-4 md:p-6">
+                <div className="py-12">
+                  <LoadingLogo message="Loading kiosk session..." size="lg" />
+                </div>
+              </div>
+            ) : (
+              <>
             {/* Header Card */}
             <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
@@ -122,17 +131,8 @@ export default function KiosksPage() {
               </div>
             </div>
 
-            {/* Loading State */}
-            {showLoading && (
-              <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-300 p-3 sm:p-4 md:p-6">
-                <div className="py-12">
-                  <LoadingLogo message="Loading kiosk session..." size="lg" />
-                </div>
-              </div>
-            )}
-
             {/* Stale Session Warning Banner */}
-            {!showLoading && session && isStale && (
+            {session && isStale && (
               <div className="bg-yellow-50 rounded-xl sm:rounded-2xl border-2 border-yellow-300 p-3 sm:p-4 shadow-sm">
                 <div className="flex items-start gap-2 sm:gap-3">
                   <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -150,7 +150,7 @@ export default function KiosksPage() {
             )}
 
             {/* Session Display */}
-            {!showLoading && session && (
+            {session && (
               <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-300 p-4 sm:p-6 shadow">
                 {/* Status Badge */}
                 <div className="flex items-center gap-2 mb-4 sm:mb-6">
@@ -233,6 +233,8 @@ export default function KiosksPage() {
               </div>
             )}
 
+              </>
+            )}
           </div>
         </div>
       </div>

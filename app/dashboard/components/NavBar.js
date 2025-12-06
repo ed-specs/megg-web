@@ -25,6 +25,7 @@ import {
   User,
   LogOut,
   MonitorDot,
+  Sliders,
 } from "lucide-react";
 import { auth, db } from "../../config/firebaseConfig.js";
 import { doc, getDoc } from "firebase/firestore";
@@ -235,7 +236,27 @@ export function Navbar() {
       href: "/dashboard/settings/preferences",
       icon: MonitorCog,
     },
+    {
+      name: "Configuration",
+      href: "/dashboard/settings/configuration",
+      icon: Sliders,
+    },
   ];
+
+  // Keep dropdowns open if current path matches their links
+  useEffect(() => {
+    // Keep settings dropdown open if current path is a settings page
+    const isSettingsPage = manageAccountLinks.some(link => pathname === link.href);
+    if (isSettingsPage) {
+      setManageAccountDropdown(true);
+    }
+    
+    // Keep history dropdown open if current path is a history page
+    const isHistoryPage = historyLinks.some(link => pathname === link.href);
+    if (isHistoryPage) {
+      setHistoryDropdown(true);
+    }
+  }, [pathname]);
 
   return (
     <div className="w-full max-w-xs text-[#1F2421]">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Save, SaveOff, TriangleAlert } from "lucide-react"
 import { auth, db } from "../../../config/firebaseConfig"
 import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from "firebase/auth"
@@ -15,18 +15,26 @@ import { getPasswordStrength } from "../../../utils/validation"
 import PasswordStrengthIndicator from "../../../(auth)/components/PasswordStrengthIndicator"
 import bcrypt from "bcryptjs"
 import ResultModal from "../../components/ResultModal"
+import LoadingLogo from "../../components/LoadingLogo"
+import { useLoadingDelay } from "../../components/useLoadingDelay"
 
 export default function ChangePasswordPage() {
   const [isSidebarOpen, setSidebarOpen] = useState(false)
   const [globalMessage, setGlobalMessage] = useState("")
   const [errors, setErrors] = useState({})
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const showLoading = useLoadingDelay(loading, 500)
   const [passwordStrength, setPasswordStrength] = useState({ score: 0, level: 'weak' })
   const [formData, setFormData] = useState({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   })
+
+  // Set loading to false on mount (no async data loading needed)
+  useEffect(() => {
+    setLoading(false)
+  }, [])
 
   const validate = useCallback((name, value) => {
     const validationErrors = { ...errors }
@@ -274,6 +282,26 @@ export default function ChangePasswordPage() {
       formData.newPassword === formData.confirmPassword &&
       formData.newPassword.length >= 8 &&
       !Object.values(errors).some(error => error)
+    )
+  }
+
+  if (showLoading) {
+    return (
+      <div className="min-h-screen container mx-auto text-[#1F2421] relative">
+        <div className="flex gap-6 p-4 md:p-6">
+          <div className="hidden lg:block">
+            <Navbar />
+          </div>
+          <div className="flex flex-1 flex-col gap-6 w-full">
+            <Header setSidebarOpen={() => {}} />
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <LoadingLogo message="Loading password settings..." size="lg" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     )
   }
 

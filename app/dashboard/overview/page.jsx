@@ -8,6 +8,7 @@ import {
   Lightbulb, Award, Clock, Settings
 } from "lucide-react";
 import LoadingLogo from "../components/LoadingLogo";
+import { useLoadingDelay } from "../components/useLoadingDelay";
 import { getUserAccountId } from "../../utils/auth-utils";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../config/firebaseConfig";
@@ -49,6 +50,7 @@ const formatTime = (minutes) => {
 export default function OverviewPage() {
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  const showLoading = useLoadingDelay(loading, 500);
   const [rawBatchesData, setRawBatchesData] = useState([]);
   const [error, setError] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -384,6 +386,15 @@ export default function OverviewPage() {
 
           {/* Main Content */}
           <div className="flex flex-col gap-4 md:gap-6">
+            {/* Loading State */}
+            {showLoading ? (
+              <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-300 p-3 sm:p-4 md:p-6">
+                <div className="py-12">
+                  <LoadingLogo message="Loading overview data..." size="lg" />
+                </div>
+              </div>
+            ) : (
+              <>
             {/* Header Card */}
             <div className="bg-white rounded-2xl border border-gray-300 p-4 md:p-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
@@ -483,11 +494,7 @@ export default function OverviewPage() {
               </div>
             )}
 
-            {loading ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-6 md:p-12">
-                <LoadingLogo message="Loading overview data..." />
-              </div>
-            ) : error ? (
+            {error ? (
               <div className="bg-white border border-gray-200 rounded-xl p-6 md:p-12">
                 <div className="flex flex-col items-center justify-center gap-4">
                   <div className="text-red-600 text-lg font-medium">⚠️ {error}</div>
@@ -863,6 +870,8 @@ export default function OverviewPage() {
                     </div>
                   </div>
                 )}
+              </>
+            )}
               </>
             )}
           </div>

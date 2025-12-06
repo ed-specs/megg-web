@@ -19,6 +19,8 @@ import { saveAuditLog } from "../../../utils/audit-log"
 import ImageEditor from "../../../components/ImageEditor"
 import ResultModal from "../../components/ResultModal"
 import MultipleFarmManager from "../components/MultipleFarmManager"
+import LoadingLogo from "../../components/LoadingLogo"
+import { useLoadingDelay } from "../../components/useLoadingDelay"
 
 export default function EditProfile() {
   const [isSidebarOpen, setSidebarOpen] = useState(false)
@@ -43,6 +45,7 @@ export default function EditProfile() {
     farms: [], // Multiple farms support
   })
   const [loading, setLoading] = useState(true)
+  const showLoading = useLoadingDelay(loading, 500)
   const [originalUserData, setOriginalUserData] = useState({})
   const router = useRouter()
 
@@ -546,69 +549,23 @@ export default function EditProfile() {
     return JSON.stringify(currentFields) !== JSON.stringify(originalFields)
   }, [userData, originalUserData])
 
-  if (loading && !userData.fullname) {
+  if (showLoading) {
     return (
       <div className="min-h-screen container mx-auto text-[#1F2421] relative">
-          {/* MAIN */}
-          <div className="flex gap-4 md:gap-6 p-3 md:p-4 lg:p-6">
-            {/* Desktop Sidebar */}
-            <div className="hidden lg:block">
-              <Navbar />
-            </div>
-
-            <div className="flex flex-1 flex-col gap-4 md:gap-6 w-full min-w-0">
-              {/* Header Skeleton */}
-              <div className="bg-white border border-gray-300 rounded-2xl shadow p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse"></div>
-                    <div className="space-y-2">
-                      <div className="h-4 bg-gray-200 rounded w-24 animate-pulse"></div>
-                      <div className="h-3 bg-gray-200 rounded w-16 animate-pulse"></div>
-                    </div>
-                  </div>
-                  <div className="w-8 h-8 bg-gray-200 rounded animate-pulse lg:hidden"></div>
-                </div>
-              </div>
-
-              {/* Profile Image Section Skeleton */}
-              <div className="bg-white border border-gray-300 rounded-2xl shadow p-6">
-                <div className="h-8 bg-gray-200 rounded w-40 animate-pulse mb-8"></div>
-                <div className="flex flex-col lg:flex-row items-center gap-8">
-                  <div className="w-32 h-32 bg-gray-200 rounded-full animate-pulse border-4 border-gray-200"></div>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="h-12 bg-gray-200 rounded-2xl w-40 animate-pulse"></div>
-                      <div className="h-12 bg-gray-200 rounded-2xl w-32 animate-pulse"></div>
-                    </div>
-                    <div className="h-16 bg-gray-200 rounded-xl w-80 animate-pulse"></div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Profile Information Skeleton */}
-              <div className="bg-white border border-gray-300 rounded-2xl shadow p-6">
-                <div className="h-8 bg-gray-200 rounded w-48 animate-pulse mb-8"></div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {[...Array(6)].map((_, index) => (
-                    <div key={index} className={index === 5 ? "md:col-span-2" : ""}>
-                      <div className="h-4 bg-gray-200 rounded w-20 animate-pulse mb-3"></div>
-                      <div className={`bg-gray-50 rounded-2xl border border-gray-200 p-4 ${index === 5 ? "h-20" : "h-14"}`}>
-                        <div className="h-5 bg-gray-200 rounded w-full animate-pulse"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Action Buttons Skeleton */}
-                <div className="flex flex-col sm:flex-row justify-end gap-4 mt-8">
-                  <div className="h-14 bg-gray-200 rounded-2xl w-32 animate-pulse"></div>
-                  <div className="h-14 bg-gray-200 rounded-2xl w-40 animate-pulse"></div>
-                </div>
+        <div className="flex gap-6 p-4 md:p-6">
+          <div className="hidden lg:block">
+            <Navbar />
+          </div>
+          <div className="flex flex-1 flex-col gap-6 w-full">
+            <Header setSidebarOpen={() => {}} />
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <LoadingLogo message="Loading profile..." size="lg" />
               </div>
             </div>
           </div>
         </div>
+      </div>
     )
   }
 
