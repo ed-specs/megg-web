@@ -1,9 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { BarChart3, TrendingDown, Bug, AlertTriangle } from "lucide-react";
+import { BarChart3, TrendingDown, Bug, Clock, TrendingUp } from "lucide-react";
 import LoadingLogo from "../../../components/LoadingLogo";
 import { useLoadingDelay } from "../../../components/useLoadingDelay";
+import { db } from "../../../../config/firebaseConfig";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { getUserAccountId } from "../../../../utils/auth-utils";
+
+// Color palette
+const COLORS = {
+  darkBlue: '#105588',
+  brightOrange: '#FF4A08',
+  lightCoral: '#F69664',
+  tan: '#E4BE76',
+  lightBlue: '#E2F5FC',
+  // Lighter versions for backgrounds
+  darkBlueLight: '#E2F5FC',
+  coralLight: '#FEF0E8',
+  tanLight: '#FAF5EB',
+  orangeLight: '#FFF0E8',
+};
 
 export default function Statistics() {
   const [loading, setLoading] = useState(true);
@@ -11,26 +28,79 @@ export default function Statistics() {
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    // Mock data loading
-    const timer = setTimeout(() => {
-      setStats({
-        totalDefects: 342,
-        avgPerDay: 28.5,
-        worstDay: 45,
-        bestDay: 12,
-        defectRate: 2.2,
-        defectDistribution: {
-          Cracked: 145,
-          Dirty: 98,
-          Broken: 56,
-          Deformed: 28,
-          Undersized: 15
+    const fetchStatistics = async () => {
+      try {
+        setLoading(true);
+        
+        const accountId = getUserAccountId();
+        if (!accountId) {
+          setLoading(false);
+          return;
         }
-      });
-      setLoading(false);
-    }, 1000);
 
-    return () => clearTimeout(timer);
+        // Fetch all eggs for this account
+        const eggsRef = collection(db, "eggs");
+        const q = query(eggsRef, where("accountId", "==", accountId));
+        const querySnapshot = await getDocs(q);
+
+        const eggs = [];
+        querySnapshot.forEach((doc) => {
+          eggs.push(doc.data());
+        });
+
+        if (eggs.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        // Filter defects (only cracked and dirty)
+        const defects = eggs.filter(egg => egg.quality && (egg.quality === 'cracked' || egg.quality === 'dirty'));
+        const totalDefects = defects.length;
+        const totalEggs = eggs.length;
+        
+        // Defect distribution
+        const defectDistribution = {};
+        
+        // Daily defect counts
+        const dailyDefectCounts = {};
+        
+        defects.forEach(egg => {
+          // Count by defect type (capitalize first letter)
+          const defectType = egg.quality ? egg.quality.charAt(0).toUpperCase() + egg.quality.slice(1) : 'Unknown';
+          defectDistribution[defectType] = (defectDistribution[defectType] || 0) + 1;
+          
+          // Count by day
+          if (egg.createdAt) {
+            const date = new Date(egg.createdAt);
+            const dateKey = date.toISOString().split('T')[0];
+            dailyDefectCounts[dateKey] = (dailyDefectCounts[dateKey] || 0) + 1;
+          }
+        });
+
+        // Calculate daily stats
+        const dailyValues = Object.values(dailyDefectCounts);
+        const avgPerDay = dailyValues.length > 0 
+          ? Math.round(dailyValues.reduce((sum, count) => sum + count, 0) / dailyValues.length)
+          : 0;
+        const worstDay = dailyValues.length > 0 ? Math.max(...dailyValues) : 0;
+        const bestDay = dailyValues.length > 0 ? Math.min(...dailyValues) : 0;
+
+        setStats({
+          totalDefects,
+          avgPerDay,
+          worstDay,
+          bestDay,
+          defectDistribution
+        });
+        
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching defect statistics:", error);
+        setLoading(false);
+      }
+    };
+
+    fetchStatistics();
   }, []);
 
   if (showLoading) {
@@ -43,117 +113,120 @@ export default function Statistics() {
 
   const getDefectColor = (defect) => {
     switch (defect) {
-      case "Cracked": return "text-red-500";
-      case "Dirty": return "text-yellow-500";
-      case "Broken": return "text-orange-500";
-      case "Deformed": return "text-pink-500";
-      case "Undersized": return "text-blue-500";
-      default: return "text-gray-500";
+      case "Cracked": return { color: COLORS.brightOrange };
+      case "Dirty": return { color: COLORS.tan };
+      default: return { color: '#6B7280' };
     }
   };
 
   const getDefectBgColor = (defect) => {
     switch (defect) {
-      case "Cracked": return "bg-red-100";
-      case "Dirty": return "bg-yellow-100";
-      case "Broken": return "bg-orange-100";
-      case "Deformed": return "bg-pink-100";
-      case "Undersized": return "bg-blue-100";
-      default: return "bg-gray-100";
+      case "Cracked": return { backgroundColor: COLORS.orangeLight };
+      case "Dirty": return { backgroundColor: COLORS.tanLight };
+      default: return { backgroundColor: '#F9FAFB' };
     }
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
-          <BarChart3 className="w-5 h-5" />
-          Defect Statistics
+    <div className="p-4 sm:p-6">
+        <div className="mb-6 sm:mb-8">
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 flex items-center gap-2 sm:gap-3 mb-2">
+          <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" style={{ color: COLORS.brightOrange }} />
+          <span>Defect Statistics</span>
         </h2>
-        <p className="text-gray-600">Overall defect detection metrics</p>
+        <p className="text-sm sm:text-base text-gray-600 ml-0 sm:ml-9">Overall defect detection metrics</p>
       </div>
 
       {stats ? (
-        <div className="space-y-6">
-          {/* Overview Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <Bug className="w-5 h-5 text-red-600" />
+        <div className="space-y-6 sm:space-y-8">
+          {/* Overview Stats - Main Metrics */}
+          <div className="grid grid-cols-1 gap-4 sm:gap-6">
+            {/* Total Defects - Featured Card */}
+            <div className="bg-white border-2 rounded-xl p-4 sm:p-6 shadow-sm" style={{ borderColor: COLORS.orangeLight }}>
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="p-2 sm:p-3 rounded-xl flex-shrink-0" style={{ backgroundColor: COLORS.orangeLight }}>
+                  <Bug className="w-5 h-5 sm:w-6 sm:h-6" style={{ color: COLORS.brightOrange }} />
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Total Defects</p>
-                  <p className="text-xl font-semibold text-gray-900">{stats.totalDefects.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Avg/Day</p>
-                  <p className="text-xl font-semibold text-gray-900">{stats.avgPerDay.toFixed(1)}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <TrendingDown className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Worst Day</p>
-                  <p className="text-xl font-semibold text-gray-900">{stats.worstDay.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <TrendingDown className="w-5 h-5 text-green-600 transform rotate-180" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Best Day</p>
-                  <p className="text-xl font-semibold text-gray-900">{stats.bestDay.toLocaleString()}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-200 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <BarChart3 className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Defect Rate</p>
-                  <p className="text-xl font-semibold text-gray-900">{stats.defectRate}%</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Total Defects Detected</p>
+                  <p className="text-2xl sm:text-3xl font-bold text-gray-900 break-words">{stats.totalDefects.toLocaleString()}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Defect Distribution */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Defect Type Distribution</h3>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {/* Daily Performance Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="p-2 sm:p-3 rounded-lg flex-shrink-0" style={{ backgroundColor: COLORS.tanLight }}>
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: COLORS.tan }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Average per Day</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{stats.avgPerDay.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="p-2 sm:p-3 rounded-lg flex-shrink-0" style={{ backgroundColor: COLORS.orangeLight }}>
+                  <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: COLORS.brightOrange }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Worst Day</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{stats.worstDay.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-sm hover:shadow-md transition-shadow sm:col-span-2 lg:col-span-1">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="p-2 sm:p-3 rounded-lg flex-shrink-0" style={{ backgroundColor: COLORS.coralLight }}>
+                  <TrendingDown className="w-4 h-4 sm:w-5 sm:h-5" style={{ color: COLORS.lightCoral }} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600 mb-1">Best Day</p>
+                  <p className="text-xl sm:text-2xl font-bold text-gray-900 break-words">{stats.bestDay.toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Defect Type Distribution */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-6 lg:p-8 shadow-sm">
+            <div className="mb-4 sm:mb-6">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1 sm:mb-2">Defect Type Distribution</h3>
+              <p className="text-xs sm:text-sm text-gray-600">Breakdown of defects by type</p>
+            </div>
+            {/* Mobile: Stacked cards, Desktop: Grid */}
+            <div className="space-y-2.5 sm:space-y-0 sm:grid sm:grid-cols-2 sm:gap-6 lg:gap-8">
               {Object.entries(stats.defectDistribution).map(([defect, count]) => {
                 const percentage = ((count / stats.totalDefects) * 100).toFixed(1);
                 return (
-                  <div key={defect} className="text-center">
-                    <div className={`w-16 h-16 mx-auto mb-2 rounded-full flex items-center justify-center ${getDefectBgColor(defect)}`}>
-                      <Bug className={`w-8 h-8 ${getDefectColor(defect)}`} />
+                  <div 
+                    key={defect} 
+                    className="bg-gradient-to-br from-gray-50 to-gray-100/50 sm:bg-transparent rounded-xl sm:rounded-none p-4 sm:p-0 border border-gray-200/60 sm:border-0 shadow-sm sm:shadow-none"
+                  >
+                    {/* Mobile: Icon and content side by side, Desktop: Centered vertical */}
+                    <div className="flex items-center sm:flex-col sm:items-center gap-4 sm:gap-0">
+                      {/* Icon */}
+                      <div 
+                        className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 sm:mx-auto mb-0 sm:mb-4 rounded-full flex items-center justify-center shadow-md"
+                        style={getDefectBgColor(defect)}
+                      >
+                        <Bug className="w-8 h-8 sm:w-10 sm:h-10" style={getDefectColor(defect)} />
+                      </div>
+                      {/* Content */}
+                      <div className="flex-1 sm:flex-none text-left sm:text-center min-w-0 sm:w-full">
+                        <div className="text-2xl sm:text-2xl lg:text-3xl font-bold mb-1" style={getDefectColor(defect)}>
+                          {count.toLocaleString()}
+                        </div>
+                        <div className="text-base sm:text-base font-semibold text-gray-800 mb-0.5 sm:mb-1">{defect}</div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-600">{percentage}% of total</div>
+                      </div>
                     </div>
-                    <div className={`text-2xl font-bold ${getDefectColor(defect)}`}>
-                      {count.toLocaleString()}
-                    </div>
-                    <div className="text-sm text-gray-500">{defect}</div>
-                    <div className="text-xs text-gray-400">{percentage}%</div>
                   </div>
                 );
               })}
@@ -161,10 +234,12 @@ export default function Statistics() {
           </div>
         </div>
       ) : (
-        <div className="text-center py-12">
-          <Bug className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-          <p className="text-lg font-medium text-gray-500">No defect statistics available</p>
-          <p className="text-sm text-gray-400">Data will appear when defects are detected</p>
+        <div className="text-center py-12 sm:py-16">
+          <div className="mb-4">
+            <Bug className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4" style={{ color: COLORS.lightBlue }} />
+          </div>
+          <p className="text-lg sm:text-xl font-semibold text-gray-700 mb-2">No statistics available</p>
+          <p className="text-xs sm:text-sm text-gray-500 px-4">Data will appear when defects are detected</p>
         </div>
       )}
     </div>

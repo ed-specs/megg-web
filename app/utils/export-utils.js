@@ -815,8 +815,11 @@ export const exportDefectLogs = async (data, format) => {
       exportToExcel(exportData, filename, 'Defect Logs');
       break;
     case 'pdf':
-      await exportToPDF(exportData, filename, title, columns);
+      await exportDefectLogsPDF(data, filename);
       break;
+    case 'print':
+      // For print, return PDF blob instead of saving
+      return await exportDefectLogsPDF(data, null);
     case 'image':
       alert('Image export is only available for charts/tables on screen. Please use the image export button on the relevant view.');
       break;
@@ -890,22 +893,28 @@ export const exportSortLogs = async (data, format) => {
     timestamp: log.timestamp
       ? (typeof log.timestamp === 'string'
           ? new Date(log.timestamp).toLocaleString()
-          : log.timestamp.seconds
-            ? new Date(log.timestamp.seconds * 1000).toLocaleString()
-            : 'N/A')
+          : log.timestamp instanceof Date
+            ? log.timestamp.toLocaleString()
+            : log.timestamp.seconds
+              ? new Date(log.timestamp.seconds * 1000).toLocaleString()
+              : 'N/A')
       : 'N/A',
-    batch_id: log.batch_id || log.batchNumber || 'Unknown',
-    weight: typeof log.weight === 'number' ? log.weight : 'N/A',
-    size: log.size || 'Unknown',
-    machine_id: log.machine_id || log.machineId || 'N/A'
+    egg_id: log.eggId || log.id || 'Unknown',
+    batch_number: log.batchNumber || log.batch_id || 'Unknown',
+    batch_id: log.batchId || log.batch_id || 'Unknown',
+    weight: typeof log.weight === 'number' ? log.weight.toFixed(2) : 'N/A',
+    size: log.eggSize || log.size || 'Unknown',
+    quality: log.quality ? (log.quality.charAt(0).toUpperCase() + log.quality.slice(1)) : 'Good'
   }));
 
   const columns = [
     { key: 'timestamp', header: 'Timestamp' },
+    { key: 'egg_id', header: 'Egg ID' },
+    { key: 'batch_number', header: 'Batch Number' },
     { key: 'batch_id', header: 'Batch ID' },
     { key: 'weight', header: 'Weight (g)' },
     { key: 'size', header: 'Size' },
-    { key: 'machine_id', header: 'Machine ID' }
+    { key: 'quality', header: 'Quality' }
   ];
 
   const filename = `sort-logs-${new Date().toISOString().split('T')[0]}`;
@@ -921,13 +930,791 @@ export const exportSortLogs = async (data, format) => {
       exportToExcel(exportData, filename, 'Sort Logs');
       break;
     case 'pdf':
-      await exportToPDF(exportData, filename, title, columns);
+      await exportSortLogsPDF(data, filename);
       break;
+    case 'print':
+      // For print, return PDF blob instead of saving
+      return await exportSortLogsPDF(data, null);
     case 'image':
       alert('Image export is only available for charts/tables on screen. Please use the image export button on the relevant view.');
       break;
     default:
       console.warn('Unknown export format:', format, exportData);
+  }
+}
+
+// Sort Logs PDF Export (Custom layout matching inventory style)
+const exportSortLogsPDF = async (data, filename) => {
+  if (!data || data.length === 0) {
+    console.warn('No sort logs to export')
+    return
+  }
+
+  const doc = new jsPDF('landscape'); // Use landscape for better table layout
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Get user farm info and load MEGG logo
+  const [farmInfo, meggLogo] = await Promise.all([
+    getUserFarmInfo(),
+    getImageBase64('/logo.png'),
+  ]);
+
+  // Calculate summary statistics
+  const totalLogs = data.length;
+  const totalWeight = data.reduce((sum, log) => sum + (log.weight || 0), 0);
+  const avgWeight = totalLogs > 0 ? (totalWeight / totalLogs).toFixed(2) : '0.00';
+  
+  // Size distribution
+  const sizeDistribution = {};
+  data.forEach(log => {
+    const size = log.eggSize || log.size || 'Unknown';
+    sizeDistribution[size] = (sizeDistribution[size] || 0) + 1;
+  });
+
+  // Date range
+  const timestamps = data
+    .map(log => {
+      if (!log.timestamp) return null;
+      if (typeof log.timestamp === 'string') return new Date(log.timestamp);
+      if (log.timestamp instanceof Date) return log.timestamp;
+      if (log.timestamp.seconds) return new Date(log.timestamp.seconds * 1000);
+      return null;
+    })
+    .filter(date => date !== null);
+  
+  const minDate = timestamps.length > 0 ? new Date(Math.min(...timestamps)) : null;
+  const maxDate = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
+
+  // --- HEADER (Content-Centric) ---
+  let y = 15;
+  const logoSize = 20; // Small logo
+  const marginLeft = 15;
+  
+  // Logo at top left
+  doc.addImage(meggLogo, 'PNG', marginLeft, y, logoSize, logoSize);
+  
+  // Title next to logo
+  doc.setFontSize(18);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136); // MEGG Blue
+  doc.text('Sort Logs Report', marginLeft + logoSize + 8, y + 7);
+  
+  // Farm info on the right side
+  if (farmInfo.farmName || farmInfo.farmAddress) {
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(80, 80, 80);
+    let rightY = y + 4;
+    if (farmInfo.farmName) {
+      doc.text(farmInfo.farmName, pageWidth - marginLeft, rightY, { align: 'right' });
+      rightY += 5;
+    }
+    if (farmInfo.farmAddress) {
+      doc.text(farmInfo.farmAddress, pageWidth - marginLeft, rightY, { align: 'right' });
+    }
+  }
+  
+  y += logoSize + 8;
+  
+  // Horizontal line
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(marginLeft, y, pageWidth - marginLeft, y);
+  y += 10;
+  
+  // Generation date - small and on the right
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Generated: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`, pageWidth - marginLeft, y, { align: 'right' });
+  y += 12;
+
+  // --- SUMMARY SECTION ---
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136);
+  doc.text('Summary', marginLeft, y);
+  y += 8;
+  
+  // Clean layout - 3 columns for better use of landscape space
+  const col1 = marginLeft + 5;
+  const col2 = pageWidth / 3 + 10;
+  const col3 = (pageWidth / 3) * 2 + 10;
+  
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  
+  // Column 1
+  doc.text('Total Logs:', col1, y);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(totalLogs.toLocaleString(), col1 + 45, y);
+  
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Average Weight:', col1, y + 7);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(`${avgWeight}g`, col1 + 45, y + 7);
+  
+  // Column 2
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Total Weight:', col2, y);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(`${totalWeight.toFixed(2)}g`, col2 + 40, y);
+  
+  if (minDate && maxDate) {
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.text('Date Range:', col2, y + 7);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0);
+    const dateRange = `${minDate.toLocaleDateString('en-US')} - ${maxDate.toLocaleDateString('en-US')}`;
+    doc.setFontSize(9);
+    doc.text(dateRange, col2 + 40, y + 7);
+    doc.setFontSize(10);
+  }
+  
+  // Column 3 - Size Distribution
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Size Distribution:', col3, y);
+  let sizeY = y + 7;
+  Object.entries(sizeDistribution).slice(0, 3).forEach(([size, count]) => {
+    const percentage = ((count / totalLogs) * 100).toFixed(1);
+    doc.setFontSize(9);
+    doc.text(`${size}: ${count} (${percentage}%)`, col3, sizeY);
+    sizeY += 5;
+  });
+  
+  addFooter(doc, pageWidth, pageHeight);
+  doc.addPage();
+
+  // --- TABLE PAGE ---
+  function addTableHeader(doc, pageWidth) {
+    const headerMargin = 10;
+    const smallLogoSize = 15;
+    let y = 8;
+    
+    // Small logo at top left
+    doc.addImage(meggLogo, 'PNG', headerMargin, y, smallLogoSize, smallLogoSize);
+    
+    // Title next to logo
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(16, 85, 136);
+    doc.text('Sort Logs Report', headerMargin + smallLogoSize + 5, y + 6);
+    
+    y += smallLogoSize + 3;
+    
+    // Thin separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.line(headerMargin, y, pageWidth - headerMargin, y);
+    return y + 5;
+  }
+
+  // Table columns - Optimized widths to fit landscape page
+  const columns = [
+    { key: 'timestamp', header: 'Timestamp', width: 50, align: 'left' },
+    { key: 'egg_id', header: 'Egg ID', width: 35, align: 'left' },
+    { key: 'size', header: 'Size', width: 25, align: 'center' },
+    { key: 'weight', header: 'Weight (g)', width: 28, align: 'right' },
+    { key: 'batch_number', header: 'Batch Number', width: 40, align: 'left' },
+  ];
+
+  const tableStartX = 12;
+  const headerHeight = 10;
+  const rowHeight = 8;
+  const fontSize = 7.5;
+  const headerFontSize = 8;
+  let yPosition = addTableHeader(doc, pageWidth) + 5;
+
+  // Section title
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136);
+  doc.text('Sort Log Details', 15, yPosition);
+  yPosition += 10;
+
+  // Table header row
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(headerFontSize);
+  doc.setTextColor(255, 255, 255);
+  doc.setFillColor(16, 85, 136); // MEGG Blue
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.2);
+  
+  let x = tableStartX;
+  
+  // Draw all header backgrounds first
+  columns.forEach((col) => {
+    doc.setFillColor(16, 85, 136);
+    doc.rect(x, yPosition, col.width, headerHeight, 'F');
+    x += col.width;
+  });
+  
+  // Draw borders and text
+  x = tableStartX;
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(headerFontSize);
+  
+  columns.forEach((col) => {
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(x, yPosition, col.width, headerHeight);
+    
+    const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+    doc.text(col.header, textX, yPosition + headerHeight / 2 + 1, { 
+      align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+      baseline: 'middle',
+      maxWidth: col.width - 6
+    });
+    x += col.width;
+  });
+  yPosition += headerHeight;
+
+  // Table data rows
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(fontSize);
+  doc.setTextColor(0, 0, 0);
+  
+  data.forEach((log, rowIdx) => {
+    if (yPosition > pageHeight - 25) {
+      addFooter(doc, pageWidth, pageHeight);
+      doc.addPage();
+      yPosition = addTableHeader(doc, pageWidth) + 5;
+      
+      // Redraw header on new page
+      x = tableStartX;
+      
+      // Draw all header backgrounds first
+      columns.forEach((col) => {
+        doc.setFillColor(16, 85, 136);
+        doc.rect(x, yPosition, col.width, headerHeight, 'F');
+        x += col.width;
+      });
+      
+      // Draw borders and text
+      x = tableStartX;
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(headerFontSize);
+      
+      columns.forEach((col) => {
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(x, yPosition, col.width, headerHeight);
+        
+        const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+        doc.text(col.header, textX, yPosition + headerHeight / 2 + 1, { 
+          align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+          baseline: 'middle',
+          maxWidth: col.width - 6
+        });
+        x += col.width;
+      });
+      yPosition += headerHeight;
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(0, 0, 0);
+    }
+
+    // Alternating row background
+    if (rowIdx % 2 === 1) {
+      x = tableStartX;
+      doc.setFillColor(245, 250, 255);
+      columns.forEach((col) => {
+        doc.rect(x, yPosition, col.width, rowHeight, 'F');
+        x += col.width;
+      });
+    }
+
+    // Cell content
+    x = tableStartX;
+    columns.forEach((col) => {
+      let value = '';
+      if (col.key === 'timestamp') {
+        if (log.timestamp) {
+          if (typeof log.timestamp === 'string') {
+            value = new Date(log.timestamp).toLocaleString('en-US', { timeZone: 'Asia/Manila' });
+          } else if (log.timestamp instanceof Date) {
+            value = log.timestamp.toLocaleString('en-US', { timeZone: 'Asia/Manila' });
+          } else if (log.timestamp.seconds) {
+            value = new Date(log.timestamp.seconds * 1000).toLocaleString('en-US', { timeZone: 'Asia/Manila' });
+          } else {
+            value = 'N/A';
+          }
+        } else {
+          value = 'N/A';
+        }
+      } else if (col.key === 'egg_id') {
+        value = log.eggId || log.id || 'Unknown';
+      } else if (col.key === 'size') {
+        value = log.eggSize || log.size || 'Unknown';
+      } else if (col.key === 'weight') {
+        value = log.weight ? log.weight.toFixed(2) : 'N/A';
+      } else if (col.key === 'batch_number') {
+        value = log.batchNumber || 'N/A';
+      }
+
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.2);
+      doc.rect(x, yPosition, col.width, rowHeight);
+      
+      // Truncate text if too long
+      const maxWidth = col.width - 6;
+      let displayValue = value;
+      
+      if (col.key === 'egg_id' && value.length > 15) {
+        displayValue = value.substring(0, 13) + '..';
+      }
+      if (col.key === 'batch_number' && value.length > 12) {
+        displayValue = value.substring(0, 10) + '..';
+      }
+      
+      const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+      doc.text(displayValue, textX, yPosition + rowHeight / 2 + 1, { 
+        align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+        baseline: 'middle',
+        maxWidth: maxWidth
+      });
+      x += col.width;
+    });
+    yPosition += rowHeight;
+  });
+
+  // Summary row (TOTALS)
+  yPosition += 2;
+  x = tableStartX;
+  
+  // Draw all backgrounds first
+  columns.forEach((col) => {
+    doc.setFillColor(230, 240, 255); // Light blue background
+    doc.rect(x, yPosition, col.width, rowHeight, 'F');
+    x += col.width;
+  });
+  
+  // Draw borders and text
+  x = tableStartX;
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(fontSize);
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.2);
+  
+  columns.forEach((col, colIdx) => {
+    doc.rect(x, yPosition, col.width, rowHeight);
+    
+    let summaryValue = '';
+    if (colIdx === 0) summaryValue = 'TOTALS';
+    else if (col.key === 'weight') summaryValue = `${totalWeight.toFixed(2)}g`;
+    else if (col.key === 'size') summaryValue = `${Object.keys(sizeDistribution).length} sizes`;
+    
+    if (summaryValue) {
+      const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+      doc.text(summaryValue, textX, yPosition + rowHeight / 2 + 1, { 
+        align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+        baseline: 'middle',
+        maxWidth: col.width - 6
+      });
+    }
+    x += col.width;
+  });
+
+  addFooter(doc, pageWidth, pageHeight);
+  
+  // Return PDF blob if requested (for printing), otherwise save
+  if (filename === null) {
+    // Enable auto-print for printing
+    doc.autoPrint({ variant: 'non-conform' });
+    // Return as blob for printing
+    return doc.output('blob');
+  } else {
+    doc.save(`${filename}.pdf`);
+  }
+}
+
+// Defect Logs PDF Export (Custom layout matching inventory style)
+const exportDefectLogsPDF = async (data, filename) => {
+  if (!data || data.length === 0) {
+    console.warn('No defect logs to export')
+    return
+  }
+
+  const doc = new jsPDF('landscape'); // Use landscape for better table layout
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+
+  // Get user farm info and load MEGG logo
+  const [farmInfo, meggLogo] = await Promise.all([
+    getUserFarmInfo(),
+    getImageBase64('/logo.png'),
+  ]);
+
+  // Calculate summary statistics
+  const totalLogs = data.length;
+  
+  // Defect type distribution
+  const defectDistribution = {};
+  data.forEach(log => {
+    const defectType = log.defectType || log.defect_type || 'Unknown';
+    defectDistribution[defectType] = (defectDistribution[defectType] || 0) + 1;
+  });
+
+  // Date range
+  const timestamps = data
+    .map(log => {
+      if (!log.timestamp) return null;
+      if (typeof log.timestamp === 'string') return new Date(log.timestamp);
+      if (log.timestamp instanceof Date) return log.timestamp;
+      if (log.timestamp.seconds) return new Date(log.timestamp.seconds * 1000);
+      return null;
+    })
+    .filter(date => date !== null);
+  
+  const minDate = timestamps.length > 0 ? new Date(Math.min(...timestamps)) : null;
+  const maxDate = timestamps.length > 0 ? new Date(Math.max(...timestamps)) : null;
+
+  // --- HEADER (Content-Centric) ---
+  let y = 15;
+  const logoSize = 20; // Small logo
+  const marginLeft = 15;
+  
+  // Logo at top left
+  doc.addImage(meggLogo, 'PNG', marginLeft, y, logoSize, logoSize);
+  
+  // Title next to logo
+  doc.setFontSize(18);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136); // MEGG Blue
+  doc.text('Defect Logs Report', marginLeft + logoSize + 8, y + 7);
+  
+  // Farm info on the right side
+  if (farmInfo.farmName || farmInfo.farmAddress) {
+    doc.setFontSize(9);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(80, 80, 80);
+    let rightY = y + 4;
+    if (farmInfo.farmName) {
+      doc.text(farmInfo.farmName, pageWidth - marginLeft, rightY, { align: 'right' });
+      rightY += 5;
+    }
+    if (farmInfo.farmAddress) {
+      doc.text(farmInfo.farmAddress, pageWidth - marginLeft, rightY, { align: 'right' });
+    }
+  }
+  
+  y += logoSize + 8;
+  
+  // Horizontal line
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(marginLeft, y, pageWidth - marginLeft, y);
+  y += 10;
+  
+  // Generation date - small and on the right
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Generated: ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`, pageWidth - marginLeft, y, { align: 'right' });
+  y += 12;
+
+  // --- SUMMARY SECTION ---
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136);
+  doc.text('Summary', marginLeft, y);
+  y += 8;
+  
+  // Clean layout - 3 columns for better use of landscape space
+  const col1 = marginLeft + 5;
+  const col2 = pageWidth / 3 + 10;
+  const col3 = (pageWidth / 3) * 2 + 10;
+  
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  
+  // Column 1
+  doc.text('Total Defects:', col1, y);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(0, 0, 0);
+  doc.text(totalLogs.toLocaleString(), col1 + 45, y);
+  
+  if (minDate && maxDate) {
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(60, 60, 60);
+    doc.text('Date Range:', col1, y + 7);
+    doc.setFont(undefined, 'normal');
+    doc.setTextColor(0, 0, 0);
+    const dateRange = `${minDate.toLocaleDateString('en-US')} - ${maxDate.toLocaleDateString('en-US')}`;
+    doc.setFontSize(9);
+    doc.text(dateRange, col1 + 45, y + 7);
+    doc.setFontSize(10);
+  }
+  
+  // Column 2 - Defect Type Distribution
+  doc.setFont(undefined, 'normal');
+  doc.setTextColor(60, 60, 60);
+  doc.text('Defect Distribution:', col2, y);
+  let defectY = y + 7;
+  Object.entries(defectDistribution).slice(0, 2).forEach(([type, count]) => {
+    const percentage = ((count / totalLogs) * 100).toFixed(1);
+    doc.setFontSize(9);
+    doc.text(`${type}: ${count} (${percentage}%)`, col2, defectY);
+    defectY += 5;
+  });
+  
+  // Column 3 - More defect types if available
+  if (Object.keys(defectDistribution).length > 2) {
+    doc.setFontSize(9);
+    Object.entries(defectDistribution).slice(2, 4).forEach(([type, count]) => {
+      const percentage = ((count / totalLogs) * 100).toFixed(1);
+      doc.text(`${type}: ${count} (${percentage}%)`, col3, defectY);
+      defectY += 5;
+    });
+  }
+  
+  addFooter(doc, pageWidth, pageHeight);
+  doc.addPage();
+
+  // --- TABLE PAGE ---
+  function addTableHeader(doc, pageWidth) {
+    const headerMargin = 10;
+    const smallLogoSize = 15;
+    let y = 8;
+    
+    // Small logo at top left
+    doc.addImage(meggLogo, 'PNG', headerMargin, y, smallLogoSize, smallLogoSize);
+    
+    // Title next to logo
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'bold');
+    doc.setTextColor(16, 85, 136);
+    doc.text('Defect Logs Report', headerMargin + smallLogoSize + 5, y + 6);
+    
+    y += smallLogoSize + 3;
+    
+    // Thin separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.2);
+    doc.line(headerMargin, y, pageWidth - headerMargin, y);
+    return y + 5;
+  }
+
+  // Table columns - Optimized widths to fit landscape page
+  const columns = [
+    { key: 'timestamp', header: 'Timestamp', width: 50, align: 'left' },
+    { key: 'egg_id', header: 'Egg ID', width: 35, align: 'left' },
+    { key: 'batch_number', header: 'Batch Number', width: 40, align: 'left' },
+    { key: 'defect_type', header: 'Defect Type', width: 30, align: 'center' },
+    { key: 'confidence', header: 'Confidence', width: 28, align: 'right' },
+  ];
+
+  const tableStartX = 12;
+  const headerHeight = 10;
+  const rowHeight = 8;
+  const fontSize = 7.5;
+  const headerFontSize = 8;
+  let yPosition = addTableHeader(doc, pageWidth) + 5;
+
+  // Section title
+  doc.setFontSize(12);
+  doc.setFont(undefined, 'bold');
+  doc.setTextColor(16, 85, 136);
+  doc.text('Defect Log Details', 15, yPosition);
+  yPosition += 10;
+
+  // Table header row
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(headerFontSize);
+  doc.setTextColor(255, 255, 255);
+  doc.setFillColor(16, 85, 136); // MEGG Blue
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.2);
+  
+  let x = tableStartX;
+  
+  // Draw all header backgrounds first
+  columns.forEach((col) => {
+    doc.setFillColor(16, 85, 136);
+    doc.rect(x, yPosition, col.width, headerHeight, 'F');
+    x += col.width;
+  });
+  
+  // Draw borders and text
+  x = tableStartX;
+  doc.setTextColor(255, 255, 255);
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(headerFontSize);
+  
+  columns.forEach((col) => {
+    doc.setDrawColor(200, 200, 200);
+    doc.rect(x, yPosition, col.width, headerHeight);
+    
+    const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+    doc.text(col.header, textX, yPosition + headerHeight / 2 + 1, { 
+      align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+      baseline: 'middle',
+      maxWidth: col.width - 6
+    });
+    x += col.width;
+  });
+  yPosition += headerHeight;
+
+  // Table data rows
+  doc.setFont(undefined, 'normal');
+  doc.setFontSize(fontSize);
+  doc.setTextColor(0, 0, 0);
+  
+  data.forEach((log, rowIdx) => {
+    if (yPosition > pageHeight - 25) {
+      addFooter(doc, pageWidth, pageHeight);
+      doc.addPage();
+      yPosition = addTableHeader(doc, pageWidth) + 5;
+      
+      // Redraw header on new page
+      x = tableStartX;
+      
+      columns.forEach((col) => {
+        doc.setFillColor(16, 85, 136);
+        doc.rect(x, yPosition, col.width, headerHeight, 'F');
+        x += col.width;
+      });
+      
+      x = tableStartX;
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(headerFontSize);
+      
+      columns.forEach((col) => {
+        doc.setDrawColor(200, 200, 200);
+        doc.rect(x, yPosition, col.width, headerHeight);
+        
+        const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+        doc.text(col.header, textX, yPosition + headerHeight / 2 + 1, { 
+          align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+          baseline: 'middle',
+          maxWidth: col.width - 6
+        });
+        x += col.width;
+      });
+      yPosition += headerHeight;
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(fontSize);
+      doc.setTextColor(0, 0, 0);
+    }
+
+    // Alternating row background
+    if (rowIdx % 2 === 1) {
+      x = tableStartX;
+      doc.setFillColor(245, 250, 255);
+      columns.forEach((col) => {
+        doc.rect(x, yPosition, col.width, rowHeight, 'F');
+        x += col.width;
+      });
+    }
+
+    // Cell content
+    x = tableStartX;
+    columns.forEach((col) => {
+      let value = '';
+      if (col.key === 'timestamp') {
+        if (log.timestamp) {
+          if (typeof log.timestamp === 'string') {
+            value = new Date(log.timestamp).toLocaleString('en-US', { timeZone: 'Asia/Manila' });
+          } else if (log.timestamp instanceof Date) {
+            value = log.timestamp.toLocaleString('en-US', { timeZone: 'Asia/Manila' });
+          } else if (log.timestamp.seconds) {
+            value = new Date(log.timestamp.seconds * 1000).toLocaleString('en-US', { timeZone: 'Asia/Manila' });
+          } else {
+            value = 'N/A';
+          }
+        } else {
+          value = 'N/A';
+        }
+      } else if (col.key === 'egg_id') {
+        value = log.eggId || log.id || 'Unknown';
+      } else if (col.key === 'batch_number') {
+        value = log.batchNumber || log.batchId || 'N/A';
+      } else if (col.key === 'defect_type') {
+        value = log.defectType || log.defect_type || 'Unknown';
+      } else if (col.key === 'confidence') {
+        const conf = log.confidence || log.confidence_score || 0;
+        value = typeof conf === 'number' ? `${(conf * 100).toFixed(1)}%` : 'N/A';
+      }
+
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.2);
+      doc.rect(x, yPosition, col.width, rowHeight);
+      
+      const maxWidth = col.width - 6;
+      let displayValue = value;
+      
+      if (col.key === 'batch_number' && value.length > 20) {
+        displayValue = value.substring(0, 18) + '..';
+      }
+      
+      const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+      doc.text(displayValue, textX, yPosition + rowHeight / 2 + 1, { 
+        align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+        baseline: 'middle',
+        maxWidth: maxWidth
+      });
+      x += col.width;
+    });
+    yPosition += rowHeight;
+  });
+
+  // Summary row (TOTALS)
+  yPosition += 2;
+  x = tableStartX;
+  
+  // Draw all backgrounds first
+  columns.forEach((col) => {
+    doc.setFillColor(230, 240, 255); // Light blue background
+    doc.rect(x, yPosition, col.width, rowHeight, 'F');
+    x += col.width;
+  });
+  
+  // Draw borders and text
+  x = tableStartX;
+  doc.setFont(undefined, 'bold');
+  doc.setFontSize(fontSize);
+  doc.setTextColor(0, 0, 0);
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.2);
+  
+  columns.forEach((col, colIdx) => {
+    doc.rect(x, yPosition, col.width, rowHeight);
+    
+    let summaryValue = '';
+    if (colIdx === 0) summaryValue = 'TOTALS';
+    else if (col.key === 'defect_type') summaryValue = `${Object.keys(defectDistribution).length} types`;
+    
+    if (summaryValue) {
+      const textX = col.align === 'right' ? x + col.width - 3 : col.align === 'center' ? x + col.width / 2 : x + 3;
+      doc.text(summaryValue, textX, yPosition + rowHeight / 2 + 1, { 
+        align: col.align === 'right' ? 'right' : col.align === 'center' ? 'center' : 'left', 
+        baseline: 'middle',
+        maxWidth: col.width - 6
+      });
+    }
+    x += col.width;
+  });
+
+  addFooter(doc, pageWidth, pageHeight);
+  
+  // Return PDF blob if requested (for printing), otherwise save
+  if (filename === null) {
+    // Enable auto-print for printing
+    doc.autoPrint({ variant: 'non-conform' });
+    // Return as blob for printing
+    return doc.output('blob');
+  } else {
+    doc.save(`${filename}.pdf`);
   }
 }
 
@@ -1304,6 +2091,9 @@ export const exportInventoryBatches = async (batches, format) => {
     case 'pdf':
       await exportInventoryBatchesPDF(batches, filename)
       break
+    case 'print':
+      // For print, we'll handle it in the component
+      return await exportInventoryBatchesPDF(batches, null)
     default:
       console.warn('Unknown export format:', format)
   }
@@ -1688,7 +2478,16 @@ const exportInventoryBatchesPDF = async (batches, filename) => {
   });
 
   addFooter(doc, pageWidth, pageHeight);
-  doc.save(`${filename}.pdf`);
+  
+  // Return PDF blob if requested (for printing), otherwise save
+  if (filename === null) {
+    // Enable auto-print for printing - this adds print instructions to the PDF
+    doc.autoPrint({ variant: 'non-conform' });
+    // Return as blob for printing - this is the EXACT same PDF as export
+    return doc.output('blob');
+  } else {
+    doc.save(`${filename}.pdf`);
+  }
 }
 
 // Individual Batch Details Export (PDF)

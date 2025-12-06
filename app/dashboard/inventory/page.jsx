@@ -556,21 +556,104 @@ export default function InventoryPage() {
   // Handle exports with progress tracking (memoized)
   const handleExportBatchList = useCallback(async (format, batchNumbers = []) => {
     try {
+      // Validate that batches are selected
+      if (batchNumbers.length === 0) {
+        setResultMessage("Please select at least one batch to export.");
+        await saveInAppNotification(
+          'Please select at least one batch to export.',
+          'export_no_batches_selected'
+        );
+        return;
+      }
+
       setIsExporting(true);
       
-      const batchesToExport = batchNumbers.length > 0
-        ? filteredAndSortedBatches.filter((batch) => batchNumbers.includes(batch.batchNumber))
-        : filteredAndSortedBatches;
+      const batchesToExport = filteredAndSortedBatches.filter((batch) => batchNumbers.includes(batch.batchNumber));
       
-      await exportInventoryBatches(batchesToExport, format);
-      
-      setShowBatchSelectionModal(false);
-      setSelectedBatches([]);
-      setResultMessage(`Batch list exported successfully as ${format.toUpperCase()}!`);
-      await saveInAppNotification(
-        `Successfully exported ${batchesToExport.length} batch${batchesToExport.length !== 1 ? 'es' : ''} as ${format.toUpperCase()}.`,
-        'batch_list_exported'
-      );
+      if (format === 'print') {
+        // Handle print - use the exact same PDF as export (same approach as sort history)
+        try {
+          // Generate PDF blob using the exact same function as PDF export
+          // This generates the EXACT same PDF as the export PDF button
+          const pdfBlob = await exportInventoryBatches(batchesToExport, 'print');
+          
+          if (!pdfBlob) {
+            throw new Error('Failed to generate PDF for printing');
+          }
+
+          // Create blob URL and open PDF directly (simpler and more reliable)
+          const pdfUrl = URL.createObjectURL(pdfBlob);
+          
+          // Open PDF directly in new window
+          const printWindow = window.open(pdfUrl, '_blank');
+          
+          if (!printWindow) {
+            alert('Please allow popups to print');
+            URL.revokeObjectURL(pdfUrl);
+            setIsExporting(false);
+            return;
+          }
+          
+          // Wait for PDF to load, then trigger print (same approach as sort history)
+          printWindow.onload = () => {
+            setTimeout(() => {
+              try {
+                printWindow.print();
+                // Don't close immediately - let user interact with print dialog
+                // Clean up URL after a delay
+                setTimeout(() => {
+                  URL.revokeObjectURL(pdfUrl);
+                }, 1000);
+              } catch (e) {
+                console.error('Print error:', e);
+                URL.revokeObjectURL(pdfUrl);
+              }
+            }, 1000);
+          };
+          
+          // Fallback: try printing after delays in case onload doesn't fire
+          setTimeout(() => {
+            try {
+              if (printWindow && !printWindow.closed) {
+                printWindow.focus();
+                printWindow.print();
+                setTimeout(() => {
+                  URL.revokeObjectURL(pdfUrl);
+                }, 1000);
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }, 2000);
+          
+          // Clean up URL when window closes
+          const checkClosed = setInterval(() => {
+            if (printWindow.closed) {
+              clearInterval(checkClosed);
+              URL.revokeObjectURL(pdfUrl);
+            }
+          }, 500);
+          
+          setShowBatchSelectionModal(false);
+          setSelectedBatches([]);
+          // No success message for print - print dialog handles it
+        } catch (error) {
+          console.error('Error printing batches:', error);
+          alert('Failed to generate print preview. Please try again.');
+          setIsExporting(false);
+          return;
+        }
+      } else {
+        await exportInventoryBatches(batchesToExport, format);
+        
+        setShowBatchSelectionModal(false);
+        setSelectedBatches([]);
+        setResultMessage(`Batch list exported successfully as ${format.toUpperCase()}!`);
+        await saveInAppNotification(
+          `Successfully exported ${batchesToExport.length} batch${batchesToExport.length !== 1 ? 'es' : ''} as ${format.toUpperCase()}.`,
+          'batch_list_exported'
+        );
+      }
     } catch (error) {
       devError("Error exporting batch list:", error);
       setResultMessage("Failed to export batch list. Please try again.");

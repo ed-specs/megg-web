@@ -5,6 +5,8 @@ import { BarChart2, Calendar, Layers, List, ChevronDown, ArrowUpWideNarrow, Char
 
 import  { Navbar } from "../../components/NavBar";
 import { Header } from "../../components/Header";
+import LoadingLogo from "../../components/LoadingLogo";
+import { useLoadingDelay } from "../../components/useLoadingDelay";
 import BatchReview from "./components/BatchReview";
 import DailySummary from "./components/DailySummary";
 import DefectLog from "./components/DefectLog";
@@ -15,6 +17,18 @@ export default function Defect() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
   const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  
+  const showLoading = useLoadingDelay(loading, 500);
+
+  // Initial page load
+  useEffect(() => {
+    // Simulate initial page load
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Tab options for the dropdown
   const tabOptions = [
@@ -45,6 +59,26 @@ export default function Defect() {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [dropdownOpen]);
+
+  if (showLoading) {
+    return (
+      <div className="min-h-screen container mx-auto text-[#1F2421] relative">
+        <div className="flex gap-6 p-4 md:p-6">
+          <div className="hidden lg:block">
+            <Navbar />
+          </div>
+          <div className="flex flex-1 flex-col gap-6 w-full">
+            <Header setSidebarOpen={() => {}} />
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <LoadingLogo message="Loading defect history..." size="lg" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen container mx-auto text-[#1F2421] relative">

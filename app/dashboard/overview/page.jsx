@@ -497,10 +497,12 @@ export default function OverviewPage() {
             {error ? (
               <div className="bg-white border border-gray-200 rounded-xl p-6 md:p-12">
                 <div className="flex flex-col items-center justify-center gap-4">
-                  <div className="text-red-600 text-lg font-medium">⚠️ {error}</div>
+                  <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-lg font-medium text-gray-500">No data available</p>
+                  <p className="text-sm text-gray-400">{error}</p>
                   <button
                     onClick={fetchData}
-                    className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    className="mt-2 px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
                   >
                     Retry
                   </button>
@@ -509,8 +511,9 @@ export default function OverviewPage() {
             ) : !hasData ? (
               <div className="bg-white border border-gray-200 rounded-xl p-6 md:p-12">
                 <div className="flex flex-col items-center justify-center gap-2">
-                  <div className="text-gray-400 text-lg font-medium">No data available</div>
-                  <div className="text-gray-500 text-sm">Start processing eggs to see statistics</div>
+                  <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-lg font-medium text-gray-500">No data available</p>
+                  <p className="text-sm text-gray-400">Start processing eggs to see statistics</p>
                 </div>
               </div>
             ) : (

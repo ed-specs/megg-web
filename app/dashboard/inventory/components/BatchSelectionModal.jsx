@@ -12,6 +12,7 @@ export default function BatchSelectionModal({
   isExporting
 }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
 
   const filteredBatches = batches.filter((batch) =>
     batch.batchNumber?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -35,11 +36,13 @@ export default function BatchSelectionModal({
 
   const handleExport = (format) => {
     if (selectedBatches.length === 0) {
-      // If no batches selected, export all filtered batches
-      onExport(format, []);
-    } else {
-      onExport(format, selectedBatches);
+      // Show error message if no batches selected
+      setErrorMessage("Please select at least one batch to export.");
+      setTimeout(() => setErrorMessage(""), 3000);
+      return;
     }
+    setErrorMessage("");
+    onExport(format, selectedBatches);
   };
 
   return (
@@ -52,7 +55,7 @@ export default function BatchSelectionModal({
             <p className="text-xs sm:text-sm text-gray-500 mt-0.5 sm:mt-1">
               {selectedBatches.length > 0
                 ? `${selectedBatches.length} batch${selectedBatches.length !== 1 ? 'es' : ''} selected`
-                : `Select batches or export all ${batches.length} batches`}
+                : `Please select batches to export`}
             </p>
           </div>
           <button
@@ -140,23 +143,38 @@ export default function BatchSelectionModal({
 
         {/* Footer with Export Options */}
         <div className="p-3 sm:p-4 border-t border-gray-200 bg-gray-50">
+          {errorMessage && (
+            <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-xs sm:text-sm text-red-800">{errorMessage}</p>
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
               <button
                 onClick={() => handleExport('csv')}
-                disabled={isExporting}
+                disabled={isExporting || selectedBatches.length === 0}
                 className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-medium"
               >
                 {isExporting ? 'Exporting...' : 'Export as CSV'}
               </button>
               <button
                 onClick={() => handleExport('pdf')}
-                disabled={isExporting}
+                disabled={isExporting || selectedBatches.length === 0}
                 className="flex-1 px-3 sm:px-4 py-1.5 sm:py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-medium"
               >
                 {isExporting ? 'Exporting...' : 'Export as PDF'}
               </button>
             </div>
+            <button
+              onClick={() => handleExport('print')}
+              disabled={isExporting || selectedBatches.length === 0}
+              className="w-full px-3 sm:px-4 py-1.5 sm:py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-xs sm:text-sm font-medium flex items-center justify-center gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              {isExporting ? 'Processing...' : 'Print'}
+            </button>
             <button
               onClick={onClose}
               className="w-full px-3 sm:px-4 py-1.5 sm:py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-xs sm:text-sm font-medium"
