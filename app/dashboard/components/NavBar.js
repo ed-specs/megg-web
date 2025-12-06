@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -202,7 +202,7 @@ export function Navbar() {
     { name: "Kiosk", href: "/dashboard/kiosks", icon: MonitorDot, badge: kioskSession ? "Connected" : null },
   ];
 
-  const historyLinks = [
+  const historyLinks = useMemo(() => [
     {
       name: "Sort history",
       href: "/dashboard/history/sort",
@@ -213,9 +213,9 @@ export function Navbar() {
       href: "/dashboard/history/defect",
       icon: Bug,
     },
-  ];
+  ], []);
 
-  const manageAccountLinks = [
+  const manageAccountLinks = useMemo(() => [
     {
       name: "Edit profile",
       href: "/dashboard/settings/edit-profile",
@@ -241,7 +241,7 @@ export function Navbar() {
       href: "/dashboard/settings/configuration",
       icon: Sliders,
     },
-  ];
+  ], []);
 
   // Keep dropdowns open if current path matches their links
   useEffect(() => {
@@ -256,7 +256,7 @@ export function Navbar() {
     if (isHistoryPage) {
       setHistoryDropdown(true);
     }
-  }, [pathname]);
+  }, [pathname, historyLinks, manageAccountLinks]);
 
   return (
     <div className="w-full max-w-xs text-[#1F2421]">
