@@ -494,7 +494,7 @@ export default function EditProfile() {
       }
 
       // Show success modal
-      setResultMessage(`Primary farm successfully changed to "${selectedFarm.name}"!\n\nThe previous primary farm "${currentPrimaryName || 'farm'}" has been moved to additional farms.\n\nDon't forget to click "Save Profile Information" to persist these changes.`)
+      setResultMessage(`"${selectedFarm.name}" is now your primary farm.\n\nDon't forget to click "Save Profile Information" to save changes.`)
       
     } catch (error) {
       devError("Error promoting farm to primary:", error)
@@ -841,9 +841,6 @@ export default function EditProfile() {
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-200 focus:ring-2 focus:ring-[#105588] focus:border-[#105588] transition-all duration-200 text-gray-800 resize-none"
                     placeholder="Enter your farm address"
                   />
-                  <p className="text-xs text-gray-500 mt-2">
-                    💡 Tip: Include city, province for better location tracking
-                  </p>
                 </div>
 
                 {/* Multiple Farm Manager */}

@@ -116,19 +116,40 @@ export default function ResultModal({
       isOpen={!!message}
       onClose={onClose}
       title={modalTitle}
-      size="lg"
+      size="md"
       showCloseButton={showCloseButton}
     >
       {/* Icon */}
-      <div className="flex justify-center mb-6">
-        <div className={`w-16 h-16 ${iconConfig.bg} rounded-full flex items-center justify-center shadow-lg`}>
-          {iconConfig.icon}
+      <div className="flex justify-center mb-4">
+        <div className={`w-12 h-12 sm:w-14 sm:h-14 ${iconConfig.bg} rounded-full flex items-center justify-center shadow-lg`}>
+          <div className="w-6 h-6 sm:w-7 sm:h-7 text-white">
+            {modalType === 'success' && (
+              <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            {modalType === 'error' && (
+              <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            )}
+            {modalType === 'warning' && (
+              <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            {(modalType === 'info' || !modalType) && (
+              <svg className="w-full h-full" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Message Content */}
-      <div className="text-center mb-8">
-        <p className="text-gray-700 leading-relaxed text-base whitespace-pre-line">
+      <div className="text-center mb-6">
+        <p className="text-gray-700 leading-relaxed text-sm sm:text-base whitespace-pre-line px-2 break-words">
           {message}
         </p>
       </div>
@@ -136,7 +157,7 @@ export default function ResultModal({
       {/* Action Button */}
       <button
         onClick={handleButtonClick}
-        className="w-full bg-[#105588] text-white py-3 px-6 rounded-2xl hover:bg-[#0d4470] focus:outline-none focus:ring-4 focus:ring-[#105588]/30 transition-all duration-200 font-semibold"
+        className="w-full bg-[#105588] text-white py-2.5 sm:py-3 px-4 sm:px-6 rounded-xl sm:rounded-2xl hover:bg-[#0d4470] focus:outline-none focus:ring-4 focus:ring-[#105588]/30 transition-all duration-200 font-semibold text-sm sm:text-base"
       >
         {buttonText}
       </button>

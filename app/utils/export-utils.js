@@ -1120,7 +1120,7 @@ const exportSortLogsPDF = async (data, filename) => {
   // Table columns - Optimized widths to fit landscape page
   const columns = [
     { key: 'timestamp', header: 'Timestamp', width: 50, align: 'left' },
-    { key: 'egg_id', header: 'Egg ID', width: 35, align: 'left' },
+    { key: 'egg_id', header: 'Egg ID', width: 50, align: 'left' },
     { key: 'size', header: 'Size', width: 25, align: 'center' },
     { key: 'weight', header: 'Weight (g)', width: 28, align: 'right' },
     { key: 'batch_number', header: 'Batch Number', width: 40, align: 'left' },
@@ -1268,8 +1268,8 @@ const exportSortLogsPDF = async (data, filename) => {
       const maxWidth = col.width - 6;
       let displayValue = value;
       
-      if (col.key === 'egg_id' && value.length > 15) {
-        displayValue = value.substring(0, 13) + '..';
+      if (col.key === 'egg_id' && value.length > 25) {
+        displayValue = value.substring(0, 23) + '..';
       }
       if (col.key === 'batch_number' && value.length > 12) {
         displayValue = value.substring(0, 10) + '..';
@@ -1507,7 +1507,7 @@ const exportDefectLogsPDF = async (data, filename) => {
   // Table columns - Optimized widths to fit landscape page
   const columns = [
     { key: 'timestamp', header: 'Timestamp', width: 50, align: 'left' },
-    { key: 'egg_id', header: 'Egg ID', width: 35, align: 'left' },
+    { key: 'egg_id', header: 'Egg ID', width: 50, align: 'left' },
     { key: 'batch_number', header: 'Batch Number', width: 40, align: 'left' },
     { key: 'defect_type', header: 'Defect Type', width: 30, align: 'center' },
     { key: 'confidence', header: 'Confidence', width: 28, align: 'right' },
