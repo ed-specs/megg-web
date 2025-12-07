@@ -543,3 +543,4 @@ export default function WeightRangeEditor({ rangeType, currentRange, allRanges, 
     </div>
   )
 }
+
