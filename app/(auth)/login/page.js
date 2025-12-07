@@ -75,8 +75,7 @@ export default function LoginPage() {
   // Helper function for role-based routing
   const redirectBasedOnRole = useCallback((userRole, delay = 2000) => {
     if (userRole === "admin") {
-      // TODO: Create separate admin dashboard - for now redirect to user dashboard
-      setTimeout(() => router.replace("/dashboard/overview"), delay)
+      setTimeout(() => router.replace("/admin/overview"), delay)
     } else {
       setTimeout(() => router.replace("/dashboard/overview"), delay)
     }
@@ -429,6 +428,7 @@ export default function LoginPage() {
             email: userEmail,
             username: userData.username,
             accountId: ensuredAccountId,
+            role: userData.role || "user",
           }),
         )
 
@@ -526,6 +526,7 @@ export default function LoginPage() {
             email: userEmail,
             username: userData.username,
             accountId: ensuredAccountId2,
+            role: userData.role || "user",
           }),
         )
 
@@ -601,10 +602,13 @@ export default function LoginPage() {
       const existingUserDoc = await getDocs(query(collection(db, "users"), where("email", "==", user.email)))
       
       let accountId = null
+      let userRole = "user" // Default role
+      
       if (!existingUserDoc.empty) {
-        // User exists, get their account ID
-        const userData = existingUserDoc.docs[0].data()
-        accountId = userData.accountId
+        // User exists, get their account ID and role
+        const existingUserData = existingUserDoc.docs[0].data()
+        accountId = existingUserData.accountId
+        userRole = existingUserData.role || "user"
         
         // Update existing document with Google provider info using Account ID
         await updateDoc(
@@ -645,6 +649,7 @@ export default function LoginPage() {
         email: user.email,
         accountId: accountId,
         deviceId: user.uid,
+        role: userRole,
       }
 
       // Initialize FCM for push notifications
@@ -658,7 +663,7 @@ export default function LoginPage() {
 
       setGlobalMessage("Login successful!")
       localStorage.setItem("user", JSON.stringify(userData))
-      setTimeout(() => router.replace("/dashboard/overview"), 2000)
+      redirectBasedOnRole(userRole, 2000)
     } catch (error) {
       devError("Error signing in with Google:", error)
       if (error.code === "permission-denied") {

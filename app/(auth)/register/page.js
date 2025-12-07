@@ -201,13 +201,13 @@ export default function RegisterPage() {
           deviceId: null, // Will be set when FCM token is available
         })
 
-        // Create default notification settings with push notifications enabled by default
+        // Create default notification settings - all enabled by default
         try {
           await setDoc(doc(db, "notificationSettings", accountId), {
             notificationsEnabled: true,
-            pushNotificationsEnabled: true, // Enable by default for new users
-            emailNotifications: false, // Disabled by default
-            inAppNotifications: true, // Always enabled by default
+            pushNotificationsEnabled: true,
+            emailNotifications: true, // Enabled by default for all users
+            inAppNotifications: true,
             defectAlerts: true,
             machineAlerts: true,
             createdAt: new Date().toISOString(),

@@ -6,9 +6,8 @@ import Image from "next/image";
 import { auth, db } from "../../config/firebaseConfig.js";
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, deleteDoc, onSnapshot } from "firebase/firestore";
 import { getUserAccountId, getStoredUser } from "../../utils/auth-utils";
-// import { signOut } from "firebase/auth";
 
-export  function Header({ setSidebarOpen }) {
+export function Header({ setSidebarOpen }) {
   const pathname = usePathname();
   const [userData, setUserData] = useState({
     username: "",
@@ -19,7 +18,7 @@ export  function Header({ setSidebarOpen }) {
   const router = useRouter();
 
   const viewProfile = () => {
-    router.push("/dashboard/profile");
+    router.push("/admin/profile");
   };
 
   const [showNotificationDropdown, setShowNotificationDropdown] = useState(
@@ -216,18 +215,11 @@ export  function Header({ setSidebarOpen }) {
 
   const pageName =
     {
-      "/dashboard/overview": "Dashboard",
-      "/dashboard/inventory": "Inventory",
-      "/dashboard/history/sort": "Sort History",
-      "/dashboard/history/defect": "Defect History",
-      "/dashboard/profile": "Profile",
-      "/dashboard/kiosks": "Kiosks",
-      "/dashboard/support": "Support & Help",
-      "/dashboard/settings/edit-profile": "Edit Profile",
-      "/dashboard/settings/change-password": "Change Password",
-      "/dashboard/settings/security": "Security",
-      "/dashboard/settings/preferences": "Preferences",
-    }[pathname] || "Page";
+      "/admin/overview": "Admin Dashboard",
+      "/admin/users": "Users Management",
+      "/admin/support": "Support Management",
+      "/admin/settings/configuration": "Global Configuration",
+    }[pathname] || "Admin Page";
   return (
     <div className="">
       {/* Header */}
@@ -510,6 +502,3 @@ export  function Header({ setSidebarOpen }) {
     </div>
   );
 }
-
-
-

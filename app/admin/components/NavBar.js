@@ -1,4 +1,4 @@
-//D:\CAPSTONE\megg-web-tech\app\dashboard\components\NavBar.js
+//D:\CAPSTONE\megg-web-tech\app\admin\components\NavBar.js
 
 "use client";
 
@@ -11,36 +11,27 @@ import {
   CircleUserRound,
   Settings,
   DoorOpen,
-  Package,
-  FolderClock,
-  ChevronDown,
-  ChevronUp,
-  ArrowUpNarrowWide,
-  Bug,
-  Bell,
-  UserPen,
-  KeyRound,
-  MonitorCog,
   Shield,
   User,
   LogOut,
-  MonitorDot,
-  Sliders,
+  ChevronDown,
+  ChevronUp,
   HelpCircle,
+  KeyRound,
+  Bell,
+  Sliders,
 } from "lucide-react";
 import { auth, db } from "../../config/firebaseConfig.js";
 import { doc, getDoc } from "firebase/firestore";
-import { signOutUser, debugAuthState } from "../../utils/auth-utils";
+import { signOutUser, debugAuthState, getUserAccountId } from "../../utils/auth-utils";
 import NotificationMobile from "../../components/ui/NotificationMobile.js";
 import { saveInAppNotification } from "../../utils/notification-utils";
-import { listenToUserKioskSession } from "../../lib/kiosks/kioskSessions.js";
 
 export function Navbar() {
   const router = useRouter();
   const pathname = usePathname();
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [historyDropdown, setHistoryDropdown] = useState(false);
   const [manageAccountDropdown, setManageAccountDropdown] = useState(false);
 
   const [userData, setUserData] = useState({
@@ -49,7 +40,6 @@ export function Navbar() {
     profileImageUrl: "",
     accountId: "",
   });
-  const [kioskSession, setKioskSession] = useState(null);
   const profileRef = useRef(null);
 
   useEffect(() => {
@@ -59,7 +49,9 @@ export function Navbar() {
     // Function to fetch user data
     const fetchUserData = async (userId) => {
       try {
-        const docRef = doc(db, "users", userId);
+        const accountId = getUserAccountId();
+        const docId = accountId || userId;
+        const docRef = doc(db, "users", docId);
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
@@ -68,7 +60,7 @@ export function Navbar() {
             username: data.username || "User",
             email: data.email || "",
             profileImageUrl: data.profileImageUrl || "/default.png",
-            accountId: data.accountId || "",
+            accountId: data.accountId || accountId || "",
           });
         }
       } catch (error) {
@@ -142,27 +134,6 @@ export function Navbar() {
     return () => unsubscribe();
   }, []);
 
-  // Listen to kiosk session for current user
-  useEffect(() => {
-    if (!userData.accountId) {
-      setKioskSession(null);
-      return;
-    }
-
-    // Set up real-time listener for user's kiosk session
-    const unsubscribe = listenToUserKioskSession(userData.accountId, (session) => {
-      if (session && session.status === "active") {
-        setKioskSession(session);
-      } else {
-        setKioskSession(null);
-      }
-    });
-
-    return () => {
-      unsubscribe();
-    };
-  }, [userData.accountId]);
-
   const toggleProfileMenu = () => {
     setProfileOpen((prev) => !prev);
   };
@@ -198,50 +169,27 @@ export function Navbar() {
   const isActive = (href) => pathname === href;
 
   const menus = [
-    { name: "Dashboard", href: "/dashboard/overview", icon: LayoutDashboard },
-    { name: "Inventory", href: "/dashboard/inventory", icon: Package },
-    { name: "Kiosk", href: "/dashboard/kiosks", icon: MonitorDot, badge: kioskSession ? "Connected" : null },
-    { name: "Support", href: "/dashboard/support", icon: HelpCircle },
+    { name: "Dashboard", href: "/admin/overview", icon: LayoutDashboard },
+    { name: "Users", href: "/admin/users", icon: User },
+    { name: "Support", href: "/admin/support", icon: HelpCircle },
+    { name: "Configuration", href: "/admin/settings/configuration", icon: Sliders },
   ];
-
-  const historyLinks = useMemo(() => [
-    {
-      name: "Sort history",
-      href: "/dashboard/history/sort",
-      icon: ArrowUpNarrowWide,
-    },
-    {
-      name: "Defect history",
-      href: "/dashboard/history/defect",
-      icon: Bug,
-    },
-  ], []);
 
   const manageAccountLinks = useMemo(() => [
     {
       name: "Edit profile",
-      href: "/dashboard/settings/edit-profile",
-      icon: UserPen,
+      href: "/admin/settings/edit-profile",
+      icon: User,
     },
     {
       name: "Change password",
-      href: "/dashboard/settings/change-password",
+      href: "/admin/settings/change-password",
       icon: KeyRound,
     },
     {
-      name: "Security",
-      href: "/dashboard/settings/security",
-      icon: Shield,
-    },
-    {
       name: "Preferences",
-      href: "/dashboard/settings/preferences",
-      icon: MonitorCog,
-    },
-    {
-      name: "Configuration",
-      href: "/dashboard/settings/configuration",
-      icon: Sliders,
+      href: "/admin/settings/preferences",
+      icon: Bell,
     },
   ], []);
 
@@ -252,13 +200,7 @@ export function Navbar() {
     if (isSettingsPage) {
       setManageAccountDropdown(true);
     }
-    
-    // Keep history dropdown open if current path is a history page
-    const isHistoryPage = historyLinks.some(link => pathname === link.href);
-    if (isHistoryPage) {
-      setHistoryDropdown(true);
-    }
-  }, [pathname, historyLinks, manageAccountLinks]);
+  }, [pathname, manageAccountLinks]);
 
   return (
     <div className="w-full max-w-xs text-[#1F2421]">
@@ -274,7 +216,7 @@ export function Navbar() {
           <div className="flex flex-col">
             <h1 className="text-2xl font-bold text-[#105588]">MEGG</h1>
             <span className="text-gray-500 text-xs">
-              Smart Egg Defect Detection and Sorting
+              Admin Dashboard
             </span>
           </div>
         </div>
@@ -283,7 +225,7 @@ export function Navbar() {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
             <span className="text-sm font-bold text-gray-500">Menus</span>
-            {menus.map(({ name, href, icon: Icon, badge }) => (
+            {menus.map(({ name, href, icon: Icon }) => (
               <Link
                 key={name}
                 href={href}
@@ -297,61 +239,17 @@ export function Navbar() {
                   <Icon className="w-5 h-5" />
                   {name}
                 </div>
-                {badge && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                    isActive(href)
-                      ? "bg-white/20 text-white"
-                      : "bg-green-100 text-green-700"
-                  }`}>
-                    {badge}
-                  </span>
-                )}
               </Link>
             ))}
-
-            {/* History Dropdown */}
-            <button
-              onClick={() => setHistoryDropdown((prev) => !prev)}
-              className="flex items-center justify-between px-4 py-2 rounded-lg transition-colors duration-150 cursor-pointer hover:bg-gray-100"
-            >
-              <div className="flex items-center gap-2">
-                <FolderClock className="w-5 h-5" />
-                History
-              </div>
-              {historyDropdown ? (
-                <ChevronUp className="w-5 h-5" />
-              ) : (
-                <ChevronDown className="w-5 h-5" />
-              )}
-            </button>
-
-            {historyDropdown && (
-              <div className="flex flex-col gap-2 border-l-4 border-gray-500 ms-4">
-                {historyLinks.map(({ name, href, icon: Icon }) => (
-                  <Link
-                    key={name}
-                    href={href}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-150 ${
-                      isActive(href)
-                        ? "text-[#105588]"
-                        : "text-gray-600 hover:text-[#105588]"
-                    }`}
-                  >
-                    <Icon className="w-5 h-5" />
-                    {name}
-                  </Link>
-                ))}
-              </div>
-            )}
           </div>
 
           {/* Management */}
           <div className="flex flex-col gap-2">
             <span className="text-sm font-bold text-gray-500">Management</span>
             <Link
-              href="/dashboard/profile"
+              href="/admin/profile"
               className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors duration-150 ${
-                isActive("/dashboard/profile")
+                isActive("/admin/profile")
                   ? "bg-[#105588] text-white"
                   : "hover:bg-gray-100"
               }`}
@@ -407,4 +305,3 @@ export function Navbar() {
     </div>
   );
 }
-

@@ -33,7 +33,7 @@ function generateNotificationId(accountId) {
 // Check if notifications are enabled before creating
 async function checkNotificationSettings(userId, type) {
   try {
-    // Always allow login, logout, password, settings, kiosk, and profile-related notifications
+    // Always allow login, logout, password, settings, kiosk, profile, and support-related notifications
     if (type === "login" || 
         type === "logout" ||
         type === "password_change" ||
@@ -51,7 +51,8 @@ async function checkNotificationSettings(userId, type) {
         type.includes("birthday_updated") || 
         type.includes("age_updated") ||
         type.includes("gender_updated") ||
-        type.includes("farm_")) {
+        type.includes("farm_") ||
+        type.includes("support_")) {
       return true
     }
 
@@ -187,6 +188,8 @@ export async function createNotification(accountId, message, type, read = false)
       "birthday_updated": "calendar",
       "age_updated": "calendar",
       "gender_updated": "user",
+      "support_request_submitted": "mail",
+      "support_request_received": "mail",
       // Inventory notifications
       "inventory_data_filtered": "filter",
       "inventory_refreshed": "refresh",
@@ -199,6 +202,8 @@ export async function createNotification(accountId, message, type, read = false)
       "batch_list_exported": "download",
       "batch_details_exported": "download",
       "batch_export_failed": "alert",
+      "support_request_submitted": "mail",
+      "support_request_received": "mail",
       // Security notifications
       "security_session_revoked": "shield",
       // Farm notifications
