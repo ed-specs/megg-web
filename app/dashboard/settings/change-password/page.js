@@ -10,7 +10,6 @@ import { Navbar } from "../../components/NavBar"
 import { Header } from "../../components/Header"
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../../../utils/auth-utils"
 import { devLog, devError } from "../../../utils/auth-helpers"
-import { saveAuditLog } from "../../../utils/audit-log"
 import { getPasswordStrength } from "../../../utils/validation"
 import PasswordStrengthIndicator from "../../../(auth)/components/PasswordStrengthIndicator"
 import bcrypt from "bcryptjs"
@@ -125,14 +124,6 @@ export default function ChangePasswordPage() {
           passwordUpdatedAt: new Date().toISOString()
         })
 
-        // Save audit log
-        await saveAuditLog(
-          docId,
-          'password_changed',
-          'Password was changed successfully',
-          { method: 'custom_auth' }
-        )
-
         setGlobalMessage("Password updated successfully!")
       } else {
         // User uses Firebase Auth - use Firebase's password update
@@ -153,14 +144,6 @@ export default function ChangePasswordPage() {
         await updateDoc(userDocRef, {
           passwordUpdatedAt: new Date().toISOString()
         })
-
-        // Save audit log
-        await saveAuditLog(
-          docId,
-          'password_changed',
-          'Password was changed successfully',
-          { method: 'firebase_auth' }
-        )
 
         setGlobalMessage("Password updated successfully!")
       }

@@ -9,7 +9,6 @@ import { db } from "../../../config/firebaseConfig"
 import { collection, query, where, getDocs, doc, deleteDoc, updateDoc, orderBy, limit } from "firebase/firestore"
 import { devLog, devError } from "../../../utils/auth-helpers"
 import { saveInAppNotification } from "../../../utils/notification-utils"
-import { saveAuditLog } from "../../../utils/audit-log"
 import ResultModal from "../../components/ResultModal"
 import LoadingLogo from "../../components/LoadingLogo"
 import { useLoadingDelay } from "../../components/useLoadingDelay"
@@ -156,14 +155,6 @@ export default function SecurityPage() {
         await saveInAppNotification(
           "A device session was revoked from your account.",
           "security_session_revoked"
-        )
-        
-        // Save audit log
-        await saveAuditLog(
-          accountId,
-          'session_revoked',
-          'A device session was revoked',
-          { sessionId: sessionId.substring(0, 20) + '...' }
         )
         
         setGlobalMessage("Session revoked successfully!")

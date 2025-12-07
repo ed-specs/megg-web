@@ -9,7 +9,6 @@ import { Navbar } from "../../components/NavBar"
 import { Header } from "../../components/Header"
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../../../utils/auth-utils"
 import { devLog, devError } from "../../../utils/auth-helpers"
-import { saveAuditLog } from "../../../utils/audit-log"
 import ResultModal from "../../components/ResultModal"
 import LoadingLogo from "../../components/LoadingLogo"
 import { useLoadingDelay } from "../../components/useLoadingDelay"
@@ -135,9 +134,6 @@ export default function NotificationSettings() {
       } catch (error) {
         devError('Error creating in-app notification:', error)
       }
-      
-      // Save audit log
-      await saveAuditLog(docId, 'settings_changed', 'Email notifications enabled')
 
       // Send test email
       try {
@@ -185,8 +181,6 @@ export default function NotificationSettings() {
         devError('Error creating in-app notification:', error)
       }
       
-      // Save audit log
-      await saveAuditLog(docId, 'settings_changed', 'Email notifications disabled')
       setGlobalMessage("Email notifications disabled.")
     }
 
@@ -232,10 +226,8 @@ export default function NotificationSettings() {
           "All notifications have been enabled.",
           "settings_change"
         )
-        await saveAuditLog(docId, 'settings_changed', 'All notifications enabled')
         setGlobalMessage("All notifications enabled!")
       } else {
-        await saveAuditLog(docId, 'settings_changed', 'All notifications disabled')
         setGlobalMessage("All notifications disabled.")
       }
       setTimeout(() => setGlobalMessage(""), 3000)
@@ -321,9 +313,6 @@ export default function NotificationSettings() {
             devError('Error sending push notification confirmation:', error)
           }
           
-          // Save audit log
-          await saveAuditLog(docId, 'settings_changed', 'Push notifications enabled')
-          
           setGlobalMessage("Push notifications enabled successfully! You should receive a test notification.")
         } else {
           // Permission denied
@@ -351,9 +340,6 @@ export default function NotificationSettings() {
         } catch (error) {
           devError('Error creating in-app notification:', error)
         }
-        
-        // Save audit log
-        await saveAuditLog(docId, 'settings_changed', 'Push notifications disabled')
         
         setGlobalMessage("Push notifications disabled")
       }

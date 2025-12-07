@@ -15,7 +15,6 @@ import { useRouter } from "next/navigation"
 import { getCurrentUser, getStoredUser, getUserAccountId } from "../../../utils/auth-utils"
 import { devLog, devError } from "../../../utils/auth-helpers"
 import { saveInAppNotification } from "../../../utils/notification-utils"
-import { saveAuditLog } from "../../../utils/audit-log"
 import ImageEditor from "../../../components/ImageEditor"
 import ResultModal from "../../components/ResultModal"
 import MultipleFarmManager from "../components/MultipleFarmManager"
@@ -295,13 +294,6 @@ export default function EditProfile() {
         
         console.log("✅ Edit Profile: Image upload completed successfully")
         
-        // Save audit log
-        await saveAuditLog(
-          notificationAccountId,
-          oldProfileImageUrl ? 'profile_image_updated' : 'profile_image_added',
-          oldProfileImageUrl ? 'Profile picture was updated' : 'Profile picture was added'
-        )
-        
         setGlobalMessage("Profile image updated successfully!")
 
         // Clear message after 3 seconds
@@ -368,14 +360,6 @@ export default function EditProfile() {
 
       setOriginalUserData(userData)
       
-      // Save audit log
-      await saveAuditLog(
-        notificationAccountId,
-        'profile_updated',
-        'Profile information was updated',
-        { fields: Object.keys(fieldsData).join(', ') }
-      )
-      
       setGlobalMessage("Profile information updated successfully!")
 
       // Clear message after 3 seconds
@@ -429,13 +413,6 @@ export default function EditProfile() {
       setProfileImage("/default.png")
       setPreviewImage(null)
       
-      // Save audit log
-      await saveAuditLog(
-        docId,
-        'profile_image_removed',
-        'Profile picture was removed'
-      )
-      
       setGlobalMessage("Profile image removed successfully!")
 
       // Clear message after 3 seconds
@@ -488,19 +465,6 @@ export default function EditProfile() {
       await saveInAppNotification(
         `Primary farm changed to "${selectedFarm.name}". Previous primary "${currentPrimaryName || 'farm'}" moved to additional farms.`,
         "farm_primary_changed"
-      )
-
-      // Save audit log
-      await saveAuditLog(
-        docId,
-        'farm_primary_changed',
-        `Primary farm changed from "${currentPrimaryName || 'N/A'}" to "${selectedFarm.name}"`,
-        { 
-          oldPrimaryName: currentPrimaryName,
-          oldPrimaryAddress: currentPrimaryAddress,
-          newPrimaryName: selectedFarm.name,
-          newPrimaryAddress: selectedFarm.address
-        }
       )
 
       // Send email notification
